@@ -1,0 +1,17 @@
+routine sumDiagonal() is
+    var matrix: array[3] array[3] integer
+    matrix[1][1] := 1
+    matrix[1][2] := 2
+    matrix[1][3] := 3
+    matrix[2][1] := 4
+    matrix[2][2] := 5
+    matrix[2][3] := 6
+    matrix[3][1] := 7
+    matrix[3][2] := 8
+    matrix[3][3] := 9
+    var total is 0
+    for i in 1..3 loop
+        total := total + matrix[i][i]
+    end
+    print total
+end
