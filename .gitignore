@@ -1,0 +1,13 @@
+# Maven
+target/
+
+# compiled classes (if built outside target/ for any reason)
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
