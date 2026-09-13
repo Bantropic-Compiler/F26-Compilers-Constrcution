@@ -1,0 +1,15 @@
+1:1	ROUTINE	routine	-
+1:9	IDENTIFIER	show	String:show
+1:13	LPAREN	(	-
+1:14	IDENTIFIER	value	String:value
+1:19	COLON	:	-
+1:21	INTEGER	integer	-
+1:28	RPAREN	)	-
+1:30	IS	is	-
+1:32	NEWLINE	\n	-
+2:5	PRINT	print	-
+2:11	IDENTIFIER	value	String:value
+2:16	NEWLINE	\n	-
+3:1	END	end	-
+3:4	NEWLINE	\n	-
+4:1	EOF		-

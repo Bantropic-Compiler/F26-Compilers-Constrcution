@@ -81,19 +81,156 @@ public class Lexer {
     }
 
     Token scanNumber() {
-        throw new UnsupportedOperationException("not implemented");
+        int line = reader.line();
+        int column = reader.column();
+        StringBuilder text = new StringBuilder();
+        while (isDigit(reader.peek())) text.append(reader.advance());
+        boolean real = reader.peek() == '.' && reader.peek(1) != '.';
+        if (real) {
+            text.append(reader.advance());
+            if (!isDigit(reader.peek())) {
+                throw new LexerException("expected digit after decimal point", line, column);
+            }
+            while (isDigit(reader.peek())) text.append(reader.advance());
+        }
+        if (isIdentifierStart(reader.peek())) {
+            throw new LexerException("invalid numeric literal", line, column);
+        }
+        String lexeme = text.toString();
+        try {
+            if (real) {
+                double value = Double.parseDouble(lexeme);
+                if (!Double.isFinite(value)) {
+                    throw new NumberFormatException();
+                }
+                return new Token(TokenType.REAL_LITERAL, lexeme, line, column, value);
+            }
+            return new Token(TokenType.INTEGER_LITERAL, lexeme, line, column,
+                    Long.parseLong(lexeme));
+        } catch (NumberFormatException e) {
+            throw new LexerException("numeric literal exceeds token value capacity", line, column);
+        }
     }
 
     Token scanString() {
-        throw new UnsupportedOperationException("not implemented");
+        return scanQuoted('"', TokenType.STRING_LITERAL);
     }
 
     Token scanChar() {
-        throw new UnsupportedOperationException("not implemented");
+        return scanQuoted('\'', TokenType.CHAR_LITERAL);
+    }
+
+    private Token scanQuoted(char quote, TokenType type) {
+        int line = reader.line();
+        int column = reader.column();
+        StringBuilder text = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        text.append(reader.advance());
+        while (!reader.isAtEnd() && reader.peek() != quote) {
+            if (reader.peek() == '\n' || reader.peek() == '\r') {
+                throw new LexerException("newline in quoted literal", line, column);
+            }
+            char c = reader.advance();
+            text.append(c);
+            if (c == '\\') {
+                if (reader.isAtEnd()) {
+                    throw new LexerException("unterminated escape sequence", line, column);
+                }
+                if (reader.peek() == '\n' || reader.peek() == '\r') {
+                    throw new LexerException("newline in quoted literal", line, column);
+                }
+                char escaped = reader.advance();
+                text.append(escaped);
+                c = switch (escaped) {
+                    case 'n' -> '\n';
+                    case 't' -> '\t';
+                    case '\\' -> '\\';
+                    case '"' -> '"';
+                    case '\'' -> '\'';
+                    default -> throw new LexerException("unsupported escape sequence: \\" + escaped,
+                            line, column);
+                };
+            }
+            value.append(c);
+        }
+        if (reader.isAtEnd()) {
+            throw new LexerException("unterminated quoted literal", line, column);
+        }
+        text.append(reader.advance());
+        String decoded = value.toString();
+        // Reject isolated UTF-16 surrogates; char means a Unicode scalar value.
+        for (int i = 0; i < decoded.length(); i++) {
+            char c = decoded.charAt(i);
+            if (Character.isHighSurrogate(c) && i + 1 < decoded.length()
+                    && Character.isLowSurrogate(decoded.charAt(i + 1))) {
+                i++;
+            } else if (Character.isSurrogate(c)) {
+                throw new LexerException("invalid Unicode in quoted literal", line, column);
+            }
+        }
+        if (type == TokenType.CHAR_LITERAL) {
+            if (decoded.codePointCount(0, decoded.length()) != 1) {
+                throw new LexerException("char literal must contain exactly one Unicode code point",
+                        line, column);
+            }
+            return new Token(type, text.toString(), line, column, decoded.codePointAt(0));
+        }
+        return new Token(type, text.toString(), line, column, decoded);
+    }
+
+    private boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 
     Token scanOperatorOrDelimiter() {
-        throw new UnsupportedOperationException("not implemented");
+        if (reader.peek() == '/') return scanSlash();
+        int line = reader.line();
+        int column = reader.column();
+        char first = reader.peek();
+        TokenType type = switch (first) {
+            case ':' -> TokenType.COLON;
+            case '.' -> TokenType.DOT;
+            case ',' -> TokenType.COMMA;
+            case '(' -> TokenType.LPAREN;
+            case ')' -> TokenType.RPAREN;
+            case '[' -> TokenType.LBRACKET;
+            case ']' -> TokenType.RBRACKET;
+            case '+' -> TokenType.PLUS;
+            case '-' -> TokenType.MINUS;
+            case '*' -> TokenType.STAR;
+            case '%' -> TokenType.PERCENT;
+            case '<' -> TokenType.LT;
+            case '>' -> TokenType.GT;
+            case '=' -> TokenType.EQ;
+            default -> throw new LexerException("unexpected character '" + first + "'", line, column);
+        };
+        reader.advance();
+        String lexeme = String.valueOf(first);
+        if (reader.peek() == '=' && (first == ':' || first == '<' || first == '>')) {
+            lexeme += reader.advance();
+            type = switch (first) {
+                case ':' -> TokenType.ASSIGN;
+                case '<' -> TokenType.LE;
+                default -> TokenType.GE;
+            };
+        } else if (first == '.' && reader.peek() == '.') {
+            lexeme += reader.advance();
+            type = TokenType.RANGE;
+        }
+        return new Token(type, lexeme, line, column, null);
+    }
+
+    /**
+     * Panic-mode recovery after a category scanner throws LexerException.
+     * Leaves whitespace and significant separators for the caller to handle.
+     * The caller collects the exception, recovers, and resumes scanning.
+     */
+    void recover() {
+        while (!reader.isAtEnd()) {
+            char c = reader.peek();
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ';') return;
+            reader.advance();
+        }
     }
 
     // --- whitespace / newline / separator / comments ---
@@ -108,8 +245,9 @@ public class Lexer {
     Token scanNewline() {
         int startLine = reader.line();
         int startColumn = reader.column();
-        reader.advance(); // consume '\n'
-        return new Token(TokenType.NEWLINE, "\n", startLine, startColumn, null);
+        String lexeme = String.valueOf(reader.advance());
+        if (lexeme.equals("\r") && reader.peek() == '\n') lexeme += reader.advance();
+        return new Token(TokenType.NEWLINE, lexeme, startLine, startColumn, null);
     }
 
     Token scanSeparator() {
@@ -143,7 +281,7 @@ public class Lexer {
     }
 
     private void skipLineComment() {
-        while (reader.peek() != '\n' && !reader.isAtEnd()) {
+        while (reader.peek() != '\n' && reader.peek() != '\r' && !reader.isAtEnd()) {
             reader.advance();
         }
     }

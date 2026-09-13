@@ -7,6 +7,20 @@ import static org.junit.jupiter.api.Assertions.*;
 class IdentifierKeywordTest {
 
     @Test
+    void recognizesEveryKeywordButNotItsLongerName() {
+        String words = "var type is routine integer real boolean char string record array while loop "
+                + "for in reverse if then else end print and or xor not true false return break continue";
+        for (String word : words.split(" ")) {
+            assertEquals(new Token(TokenType.valueOf(word.toUpperCase(java.util.Locale.ROOT)),
+                    word, 1, 1, null), new Lexer(word).scanIdentifierOrKeyword());
+            assertEquals(TokenType.IDENTIFIER,
+                    new Lexer(word + "_1").scanIdentifierOrKeyword().type());
+        }
+        assertEquals(TokenType.IDENTIFIER, new Lexer("While").scanIdentifierOrKeyword().type());
+        assertEquals("_value2", new Lexer("_value2").scanIdentifierOrKeyword().value());
+    }
+
+    @Test
     void recognizesIdentifier() {
         Lexer lexer = new Lexer("foo");
         Token token = lexer.scanIdentifierOrKeyword();

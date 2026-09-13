@@ -21,19 +21,20 @@ public class SourceReader {
 
     /** Returns character at `offset` position ahead from current without consuming it, or '\0' past end of input. */
     public char peek(int offset) {
-        int target = pos + offset;
-        if (target >= source.length()) {
+        if (offset < 0) throw new IllegalArgumentException("negative lookahead");
+        if (offset >= source.length() - pos) {
             return '\0';
         }
-        return source.charAt(target);
+        return source.charAt(pos + offset);
     }
 
     /** Consumes and returns the current character, updating line or/and column. */
     public char advance() {
+        if (isAtEnd()) return '\0';
         char current = peek();
         pos++;
-        if (current == '\n') {
-            line++;
+        if (current == '\r' || current == '\n') {
+            if (current != '\n' || pos < 2 || source.charAt(pos - 2) != '\r') line++;
             column = 1;
         } else {
             column++;
