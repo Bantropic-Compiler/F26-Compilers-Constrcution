@@ -1,6 +1,7 @@
 package compiler;
 
 import compiler.lexer.Lexer;
+import compiler.lexer.LexerException;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 
@@ -23,11 +24,16 @@ public class Main {
         String source = Files.readString(Path.of(args[0]));
         Lexer lexer = new Lexer(source);
 
-        Token token;
-        do {
-            token = lexer.nextToken();
-            System.out.printf("%3d:%-3d %-15s %s%n",
-                    token.line(), token.column(), token.type(), token.lexeme());
-        } while (token.type() != TokenType.EOF);
+        while (true) {
+            try {
+                Token token = lexer.nextToken();
+                System.out.printf("%3d:%-3d %-15s %s%n",
+                        token.line(), token.column(), token.type(), token.lexeme());
+                if (token.type() == TokenType.EOF) return;
+            } catch (LexerException error) {
+                System.err.println(error.getMessage());
+                lexer.recover();
+            }
+        }
     }
 }

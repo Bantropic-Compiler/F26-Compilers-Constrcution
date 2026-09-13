@@ -13,10 +13,31 @@ public class Lexer {
         return reader;
     }
 
-    /** Returns the next token, or an EOF token at end of input. */
+    /**
+     * Returns the next token, skipping spaces, tabs and comments.
+     * Newlines and semicolons remain significant tokens. At end of input,
+     * repeated calls return EOF at the same position.
+     *
+     * @throws LexerException on malformed input; call recover() before continuing
+     */
     public Token nextToken() {
-        // TODO
-        throw new UnsupportedOperationException("not implemented");
+        while (true) {
+            skipWhitespace();
+            if (reader.isAtEnd()) {
+                return new Token(TokenType.EOF, "", reader.line(), reader.column(), null);
+            }
+            char c = reader.peek();
+            if (isIdentifierStart(c)) return scanIdentifierOrKeyword();
+            if (isDigit(c)) return scanNumber();
+            Token token = switch (c) {
+                case '"' -> scanString();
+                case '\'' -> scanChar();
+                case '\r', '\n' -> scanNewline();
+                case ';' -> scanSeparator();
+                default -> scanOperatorOrDelimiter();
+            };
+            if (token != null) return token;
+        }
     }
 
     // --- token category scanners, one method per category ---
@@ -225,7 +246,7 @@ public class Lexer {
      * Leaves whitespace and significant separators for the caller to handle.
      * The caller collects the exception, recovers, and resumes scanning.
      */
-    void recover() {
+    public void recover() {
         while (!reader.isAtEnd()) {
             char c = reader.peek();
             if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ';') return;
