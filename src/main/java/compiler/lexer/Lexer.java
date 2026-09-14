@@ -52,7 +52,7 @@ public class Lexer {
         }
 
         String word = buffer.toString();
-        TokenType type = keywordType(word);
+        TokenType type = TokenType.keywordType(word);
         Object value = (type == TokenType.IDENTIFIER) ? word : null;
         return new Token(type, word, startLine, startColumn, value);
     }
@@ -65,71 +65,35 @@ public class Lexer {
         return Character.isLetterOrDigit(c) || c == '_';
     }
 
-    private TokenType keywordType(String word) {
-        return switch (word) {
-            case "var" -> TokenType.VAR;
-            case "type" -> TokenType.TYPE;
-            case "is" -> TokenType.IS;
-            case "routine" -> TokenType.ROUTINE;
-            case "integer" -> TokenType.INTEGER;
-            case "real" -> TokenType.REAL;
-            case "boolean" -> TokenType.BOOLEAN;
-            case "char" -> TokenType.CHAR;
-            case "string" -> TokenType.STRING;
-            case "record" -> TokenType.RECORD;
-            case "array" -> TokenType.ARRAY;
-            case "while" -> TokenType.WHILE;
-            case "loop" -> TokenType.LOOP;
-            case "for" -> TokenType.FOR;
-            case "in" -> TokenType.IN;
-            case "reverse" -> TokenType.REVERSE;
-            case "if" -> TokenType.IF;
-            case "then" -> TokenType.THEN;
-            case "else" -> TokenType.ELSE;
-            case "end" -> TokenType.END;
-            case "print" -> TokenType.PRINT;
-            case "and" -> TokenType.AND;
-            case "or" -> TokenType.OR;
-            case "xor" -> TokenType.XOR;
-            case "not" -> TokenType.NOT;
-            case "true" -> TokenType.TRUE;
-            case "false" -> TokenType.FALSE;
-            case "return" -> TokenType.RETURN;
-            case "break" -> TokenType.BREAK;
-            case "continue" -> TokenType.CONTINUE;
-            default -> TokenType.IDENTIFIER;
-        };
-    }
-
     Token scanNumber() {
-        int line = reader.line();
-        int column = reader.column();
-        StringBuilder text = new StringBuilder();
-        while (isDigit(reader.peek())) text.append(reader.advance());
+        int startLine = reader.line();
+        int startColumn = reader.column();
+        StringBuilder buffer = new StringBuilder();
+        while (isDigit(reader.peek())) buffer.append(reader.advance());
         boolean real = reader.peek() == '.' && reader.peek(1) != '.';
         if (real) {
-            text.append(reader.advance());
+            buffer.append(reader.advance());
             if (!isDigit(reader.peek())) {
-                throw new LexerException("expected digit after decimal point", line, column);
+                throw new LexerException("expected digit after decimal point", startLine, startColumn);
             }
-            while (isDigit(reader.peek())) text.append(reader.advance());
+            while (isDigit(reader.peek())) buffer.append(reader.advance());
         }
         if (isIdentifierStart(reader.peek())) {
-            throw new LexerException("invalid numeric literal", line, column);
+            throw new LexerException("invalid numeric literal", startLine, startColumn);
         }
-        String lexeme = text.toString();
+        String lexeme = buffer.toString();
         try {
             if (real) {
                 double value = Double.parseDouble(lexeme);
                 if (!Double.isFinite(value)) {
                     throw new NumberFormatException();
                 }
-                return new Token(TokenType.REAL_LITERAL, lexeme, line, column, value);
+                return new Token(TokenType.REAL_LITERAL, lexeme, startLine, startColumn, value);
             }
-            return new Token(TokenType.INTEGER_LITERAL, lexeme, line, column,
+            return new Token(TokenType.INTEGER_LITERAL, lexeme, startLine, startColumn,
                     Long.parseLong(lexeme));
         } catch (NumberFormatException e) {
-            throw new LexerException("numeric literal exceeds token value capacity", line, column);
+            throw new LexerException("numeric literal exceeds token value capacity", startLine, startColumn);
         }
     }
 
@@ -144,15 +108,15 @@ public class Lexer {
     private Token scanQuoted(char quote, TokenType type) {
         int line = reader.line();
         int column = reader.column();
-        StringBuilder text = new StringBuilder();
+        StringBuilder buffer = new StringBuilder();
         StringBuilder value = new StringBuilder();
-        text.append(reader.advance());
+        buffer.append(reader.advance());
         while (!reader.isAtEnd() && reader.peek() != quote) {
             if (reader.peek() == '\n' || reader.peek() == '\r') {
                 throw new LexerException("newline in quoted literal", line, column);
             }
             char c = reader.advance();
-            text.append(c);
+            buffer.append(c);
             if (c == '\\') {
                 if (reader.isAtEnd()) {
                     throw new LexerException("unterminated escape sequence", line, column);
@@ -161,7 +125,7 @@ public class Lexer {
                     throw new LexerException("newline in quoted literal", line, column);
                 }
                 char escaped = reader.advance();
-                text.append(escaped);
+                buffer.append(escaped);
                 c = switch (escaped) {
                     case 'n' -> '\n';
                     case 't' -> '\t';
@@ -177,7 +141,7 @@ public class Lexer {
         if (reader.isAtEnd()) {
             throw new LexerException("unterminated quoted literal", line, column);
         }
-        text.append(reader.advance());
+        buffer.append(reader.advance());
         String decoded = value.toString();
         // Reject isolated UTF-16 surrogates; char means a Unicode scalar value.
         for (int i = 0; i < decoded.length(); i++) {
@@ -194,9 +158,9 @@ public class Lexer {
                 throw new LexerException("char literal must contain exactly one Unicode code point",
                         line, column);
             }
-            return new Token(type, text.toString(), line, column, decoded.codePointAt(0));
+            return new Token(type, buffer.toString(), line, column, decoded.codePointAt(0));
         }
-        return new Token(type, text.toString(), line, column, decoded);
+        return new Token(type, buffer.toString(), line, column, decoded);
     }
 
     private boolean isDigit(char c) {
