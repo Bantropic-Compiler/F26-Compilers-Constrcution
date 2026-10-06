@@ -201,6 +201,9 @@ public class Lexer {
         } else if (first == '.' && reader.peek() == '.') {
             lexeme += reader.advance();
             type = TokenType.RANGE;
+        } else if (first == '=' && reader.peek() == '>') {
+            lexeme += reader.advance();
+            type = TokenType.ARROW;
         }
         return new Token(type, lexeme, line, column, null);
     }

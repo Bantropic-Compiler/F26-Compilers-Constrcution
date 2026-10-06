@@ -9,12 +9,12 @@ class OperatorRecoveryTest {
     @Test
     void allOperatorsUseLongestMatch() {
         String[] lexemes = {":=", ":", ".", "..", ",", "(", ")", "[", "]", "+", "-", "*",
-                "/", "%", "<", "<=", ">", ">=", "=", "/="};
+                "/", "%", "<", "<=", ">", ">=", "=", "=>", "/="};
         TokenType[] types = {TokenType.ASSIGN, TokenType.COLON, TokenType.DOT, TokenType.RANGE,
                 TokenType.COMMA, TokenType.LPAREN, TokenType.RPAREN, TokenType.LBRACKET,
                 TokenType.RBRACKET, TokenType.PLUS, TokenType.MINUS, TokenType.STAR,
                 TokenType.SLASH, TokenType.PERCENT, TokenType.LT, TokenType.LE, TokenType.GT,
-                TokenType.GE, TokenType.EQ, TokenType.NEQ};
+                TokenType.GE, TokenType.EQ, TokenType.ARROW, TokenType.NEQ};
         for (int i = 0; i < lexemes.length; i++) {
             Lexer lexer = new Lexer(lexemes[i] + "x");
             assertEquals(new Token(types[i], lexemes[i], 1, 1, null), lexer.scanOperatorOrDelimiter());
