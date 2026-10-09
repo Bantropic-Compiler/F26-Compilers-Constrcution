@@ -1,0 +1,113 @@
+Program
+  declarations:
+    TypeDeclaration
+      name: "Item"
+      type:
+        RecordTypeNode
+          members:
+            VariableDeclaration
+              initializer: null
+              name: "price"
+              type:
+                PrimitiveTypeNode
+                  kind: INTEGER
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer: null
+              name: "items"
+              type:
+                ArrayTypeNode
+                  elementType:
+                    TypeReferenceNode
+                      name: "Item"
+                  sizeExpr:
+                    IntegerLiteral
+                      value: 3
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 1
+                    FieldAccess
+                      name: "price"
+                  base: "items"
+              value:
+                IntegerLiteral
+                  value: 100
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 2
+                    FieldAccess
+                      name: "price"
+                  base: "items"
+              value:
+                IntegerLiteral
+                  value: 250
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 3
+                    FieldAccess
+                      name: "price"
+                  base: "items"
+              value:
+                IntegerLiteral
+                  value: 75
+            VariableDeclaration
+              initializer:
+                IntegerLiteral
+                  value: 0
+              name: "total"
+              type: null
+            ForStatement
+              body:
+                BlockNode
+                  items:
+                    AssignmentStatement
+                      target:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "total"
+                      value:
+                        BinaryExpression
+                          left:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "total"
+                          op: PLUS
+                          right:
+                            ModifiablePrimaryNode
+                              accessors:
+                                FieldAccess
+                                  name: "price"
+                              base: "it"
+              loopVar: "it"
+              rangeEnd: null
+              rangeStart:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "items"
+              reverse: false
+            PrintStatement
+              args:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "total"
+      name: "totalPrice"
+      parameters: []
+      returnType: null

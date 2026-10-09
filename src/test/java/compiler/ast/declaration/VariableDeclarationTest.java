@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import compiler.ast.type.PrimitiveTypeNode;
 import compiler.ast.type.TypeReferenceNode;
+import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
 import compiler.parser.ParserException;
@@ -40,5 +41,20 @@ class VariableDeclarationTest {
         assertThrows(ParserException.class, () -> VariableDeclaration.parse(p));
     }
 
-    // "var x is <expr>" and "var x: Type is <expr>" need Expression.parse().
+    @Test
+    void initializerWithoutExplicitType() {
+        VariableDeclaration decl = VariableDeclaration.parse(new Parser(new Lexer("var x is 42")));
+
+        assertNull(decl.type);
+        assertEquals(42, assertInstanceOf(IntegerLiteral.class, decl.initializer).value);
+    }
+
+    @Test
+    void typeAndInitializerTogether() {
+        VariableDeclaration decl = VariableDeclaration.parse(
+                new Parser(new Lexer("var x: integer is 42")));
+
+        assertInstanceOf(PrimitiveTypeNode.class, decl.type);
+        assertEquals(42, assertInstanceOf(IntegerLiteral.class, decl.initializer).value);
+    }
 }

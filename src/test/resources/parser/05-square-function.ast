@@ -1,0 +1,48 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            ReturnStatement
+              value:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "x"
+                  op: STAR
+                  right:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "x"
+      name: "square"
+      parameters:
+        Parameter
+          name: "x"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType:
+        PrimitiveTypeNode
+          kind: INTEGER
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            PrintStatement
+              args:
+                RoutineCallExpression
+                  args:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "value"
+                  name: "square"
+      name: "showSquare"
+      parameters:
+        Parameter
+          name: "value"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType: null

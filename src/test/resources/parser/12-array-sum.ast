@@ -1,0 +1,118 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer: null
+              name: "values"
+              type:
+                ArrayTypeNode
+                  elementType:
+                    PrimitiveTypeNode
+                      kind: INTEGER
+                  sizeExpr:
+                    IntegerLiteral
+                      value: 5
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 1
+                  base: "values"
+              value:
+                IntegerLiteral
+                  value: 10
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 2
+                  base: "values"
+              value:
+                IntegerLiteral
+                  value: 20
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 3
+                  base: "values"
+              value:
+                IntegerLiteral
+                  value: 30
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 4
+                  base: "values"
+              value:
+                IntegerLiteral
+                  value: 40
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    IndexAccess
+                      index:
+                        IntegerLiteral
+                          value: 5
+                  base: "values"
+              value:
+                IntegerLiteral
+                  value: 50
+            VariableDeclaration
+              initializer:
+                IntegerLiteral
+                  value: 0
+              name: "total"
+              type: null
+            ForStatement
+              body:
+                BlockNode
+                  items:
+                    AssignmentStatement
+                      target:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "total"
+                      value:
+                        BinaryExpression
+                          left:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "total"
+                          op: PLUS
+                          right:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "v"
+              loopVar: "v"
+              rangeEnd: null
+              rangeStart:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "values"
+              reverse: false
+            PrintStatement
+              args:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "total"
+      name: "sumArray"
+      parameters: []
+      returnType: null

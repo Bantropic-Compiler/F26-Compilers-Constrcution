@@ -1,0 +1,105 @@
+Program
+  declarations:
+    TypeDeclaration
+      name: "Address"
+      type:
+        RecordTypeNode
+          members:
+            VariableDeclaration
+              initializer: null
+              name: "city"
+              type:
+                StringTypeNode
+            VariableDeclaration
+              initializer: null
+              name: "zip"
+              type:
+                PrimitiveTypeNode
+                  kind: INTEGER
+    TypeDeclaration
+      name: "Person"
+      type:
+        RecordTypeNode
+          members:
+            VariableDeclaration
+              initializer: null
+              name: "name"
+              type:
+                StringTypeNode
+            VariableDeclaration
+              initializer: null
+              name: "home"
+              type:
+                TypeReferenceNode
+                  name: "Address"
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer: null
+              name: "p"
+              type:
+                TypeReferenceNode
+                  name: "Person"
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    FieldAccess
+                      name: "name"
+                  base: "p"
+              value:
+                StringLiteral
+                  value: "John"
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    FieldAccess
+                      name: "home"
+                    FieldAccess
+                      name: "city"
+                  base: "p"
+              value:
+                StringLiteral
+                  value: "Innopolis"
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors:
+                    FieldAccess
+                      name: "home"
+                    FieldAccess
+                      name: "zip"
+                  base: "p"
+              value:
+                IntegerLiteral
+                  value: 420500
+            PrintStatement
+              args:
+                BinaryExpression
+                  left:
+                    BinaryExpression
+                      left:
+                        ModifiablePrimaryNode
+                          accessors:
+                            FieldAccess
+                              name: "name"
+                          base: "p"
+                      op: PLUS
+                      right:
+                        StringLiteral
+                          value: ", "
+                  op: PLUS
+                  right:
+                    ModifiablePrimaryNode
+                      accessors:
+                        FieldAccess
+                          name: "home"
+                        FieldAccess
+                          name: "city"
+                      base: "p"
+      name: "buildAndShow"
+      parameters: []
+      returnType: null

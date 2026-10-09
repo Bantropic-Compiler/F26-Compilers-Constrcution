@@ -1,0 +1,128 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body: null
+      name: "isOdd"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType:
+        PrimitiveTypeNode
+          kind: BOOLEAN
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            IfStatement
+              condition:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "n"
+                  op: EQ
+                  right:
+                    IntegerLiteral
+                      value: 0
+              elseBody: null
+              thenBody:
+                BlockNode
+                  items:
+                    ReturnStatement
+                      value:
+                        BooleanLiteral
+                          value: true
+            ReturnStatement
+              value:
+                RoutineCallExpression
+                  args:
+                    BinaryExpression
+                      left:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "n"
+                      op: MINUS
+                      right:
+                        IntegerLiteral
+                          value: 1
+                  name: "isOdd"
+      name: "isEven"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType:
+        PrimitiveTypeNode
+          kind: BOOLEAN
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            IfStatement
+              condition:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "n"
+                  op: EQ
+                  right:
+                    IntegerLiteral
+                      value: 0
+              elseBody: null
+              thenBody:
+                BlockNode
+                  items:
+                    ReturnStatement
+                      value:
+                        BooleanLiteral
+                          value: false
+            ReturnStatement
+              value:
+                RoutineCallExpression
+                  args:
+                    BinaryExpression
+                      left:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "n"
+                      op: MINUS
+                      right:
+                        IntegerLiteral
+                          value: 1
+                  name: "isEven"
+      name: "isOdd"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType:
+        PrimitiveTypeNode
+          kind: BOOLEAN
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            PrintStatement
+              args:
+                RoutineCallExpression
+                  args:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "n"
+                  name: "isEven"
+      name: "checkEven"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType: null

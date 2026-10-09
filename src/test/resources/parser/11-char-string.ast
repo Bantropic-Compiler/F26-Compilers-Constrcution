@@ -1,0 +1,46 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer:
+                StringLiteral
+                  value: "Hello, "
+              name: "prefix"
+              type: null
+            VariableDeclaration
+              initializer:
+                CharLiteral
+                  codePoint: 33
+              name: "mark"
+              type:
+                PrimitiveTypeNode
+                  kind: CHAR
+            PrintStatement
+              args:
+                BinaryExpression
+                  left:
+                    BinaryExpression
+                      left:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "prefix"
+                      op: PLUS
+                      right:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "name"
+                  op: PLUS
+                  right:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "mark"
+      name: "greet"
+      parameters:
+        Parameter
+          name: "name"
+          type:
+            StringTypeNode
+      returnType: null
