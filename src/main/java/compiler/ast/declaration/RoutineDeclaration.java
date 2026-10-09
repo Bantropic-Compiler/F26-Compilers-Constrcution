@@ -1,8 +1,12 @@
-package compiler.ast;
+package compiler.ast.declaration;
 
+import compiler.ast.BlockNode;
+import compiler.ast.Node;
+import compiler.ast.expression.Expression;
+import compiler.ast.statement.ReturnStatement;
+import compiler.ast.type.TypeNode;
 import java.util.ArrayList;
 import java.util.List;
-
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
@@ -12,7 +16,7 @@ public class RoutineDeclaration extends Declaration {
     public final String name;
     public final List<Parameter> parameters;
     public final TypeNode returnType; // nullable
-    public final BlockNode body; // null = forward declaration
+    public final BlockNode body;      // null = forward declaration
 
     private RoutineDeclaration(int line, int column, String name, List<Parameter> parameters,
                                 TypeNode returnType, BlockNode body) {
@@ -30,7 +34,9 @@ public class RoutineDeclaration extends Declaration {
      *
      * "=> Expression" is desugared here into a one-statement BlockNode
      * wrapping a ReturnStatement, so later stages only ever see one
-     * body shape. Parameters is treated as optional.
+     * body shape. Parameters is treated as optional (the grammar as
+     * given requires at least one, but empty parameter lists are used
+     * throughout prog-examples/).
      */
     public static RoutineDeclaration parse(Parser p) {
         Token start = p.expect(TokenType.ROUTINE);

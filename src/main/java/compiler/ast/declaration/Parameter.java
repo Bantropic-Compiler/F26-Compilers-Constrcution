@@ -1,5 +1,7 @@
-package compiler.ast;
+package compiler.ast.declaration;
 
+import compiler.ast.Node;
+import compiler.ast.type.TypeNode;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
@@ -15,6 +17,7 @@ public class Parameter extends Node {
         this.type = type;
     }
 
+    /** ParameterDeclaration : Identifier : Type */
     public static Parameter parse(Parser p) {
         Token nameToken = p.expect(TokenType.IDENTIFIER);
         p.expect(TokenType.COLON);

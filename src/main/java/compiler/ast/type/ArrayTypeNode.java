@@ -1,5 +1,6 @@
-package compiler.ast;
+package compiler.ast.type;
 
+import compiler.ast.expression.Expression;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;

@@ -1,11 +1,10 @@
-package compiler.ast;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import org.junit.jupiter.api.Test;
+package compiler.ast.statement;
 
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class ReturnStatementTest {
 
@@ -26,5 +25,6 @@ class ReturnStatementTest {
         assertNull(r.value);
     }
 
-    // "return <expr>" needs Expression.parse()
+    // "return <expr>" needs Expression.parse() (Stage 3, Arsen) — add once
+    // that's in.
 }

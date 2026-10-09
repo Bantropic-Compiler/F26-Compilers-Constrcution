@@ -1,5 +1,7 @@
-package compiler.ast;
+package compiler.ast.declaration;
 
+import compiler.ast.expression.Expression;
+import compiler.ast.type.TypeNode;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
@@ -8,7 +10,7 @@ import compiler.parser.ParserException;
 public class VariableDeclaration extends Declaration {
 
     public final String name;
-    public final TypeNode type; // nullable
+    public final TypeNode type;          // nullable
     public final Expression initializer; // nullable
 
     private VariableDeclaration(int line, int column, String name, TypeNode type, Expression initializer) {

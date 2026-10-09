@@ -1,5 +1,6 @@
-package compiler.ast;
+package compiler.ast.statement;
 
+import compiler.ast.expression.Expression;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
@@ -13,6 +14,7 @@ public class ReturnStatement extends Statement {
         this.value = value;
     }
 
+    /** ReturnStatement : return [ Expression ] */
     public static ReturnStatement parse(Parser p) {
         Token start = p.expect(TokenType.RETURN);
         Expression value = startsExpression(p.getCurrent().type()) ? Expression.parse(p) : null;

@@ -1,8 +1,10 @@
-package compiler.ast;
+package compiler.ast.statement;
 
+import compiler.ast.Node;
 import compiler.parser.Parser;
 
 /**
+ * Stage 4 — owner: Arsen.
  * Stub so BlockNode compiles against Statement before the real
  * dispatcher (Assignment/RoutineCall/While/For/If/Print/...) is written.
  * ReturnStatement is implemented already (see ReturnStatement.java) —

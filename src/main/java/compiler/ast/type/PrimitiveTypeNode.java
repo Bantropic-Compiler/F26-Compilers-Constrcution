@@ -1,4 +1,4 @@
-package compiler.ast;
+package compiler.ast.type;
 
 import compiler.lexer.Token;
 import compiler.parser.Parser;

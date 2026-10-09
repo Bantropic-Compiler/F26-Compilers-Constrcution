@@ -1,5 +1,8 @@
 package compiler.ast;
 
+import compiler.ast.declaration.RoutineDeclaration;
+import compiler.ast.declaration.TypeDeclaration;
+import compiler.ast.declaration.VariableDeclaration;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
 import org.junit.jupiter.api.Test;

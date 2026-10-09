@@ -1,5 +1,6 @@
-package compiler.ast;
+package compiler.ast.type;
 
+import compiler.ast.Node;
 import compiler.parser.Parser;
 import compiler.parser.ParserException;
 
@@ -9,6 +10,7 @@ public abstract class TypeNode extends Node {
         super(line, column);
     }
 
+    /** Type : PrimitiveType | UserType | Identifier */
     public static TypeNode parse(Parser p) {
         return switch (p.getCurrent().type()) {
             case INTEGER, REAL, BOOLEAN, CHAR -> PrimitiveTypeNode.parse(p);

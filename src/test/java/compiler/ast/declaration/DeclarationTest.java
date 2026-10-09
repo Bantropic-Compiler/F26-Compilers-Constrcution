@@ -1,4 +1,4 @@
-package compiler.ast;
+package compiler.ast.declaration;
 
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;

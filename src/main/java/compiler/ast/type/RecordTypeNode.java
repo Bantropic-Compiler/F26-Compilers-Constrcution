@@ -1,5 +1,6 @@
-package compiler.ast;
+package compiler.ast.type;
 
+import compiler.ast.declaration.VariableDeclaration;
 import java.util.ArrayList;
 import java.util.List;
 import compiler.lexer.Token;

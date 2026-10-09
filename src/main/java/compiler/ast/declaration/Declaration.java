@@ -1,5 +1,6 @@
-package compiler.ast;
+package compiler.ast.declaration;
 
+import compiler.ast.Node;
 import compiler.parser.Parser;
 import compiler.parser.ParserException;
 
@@ -9,6 +10,7 @@ public abstract class Declaration extends Node {
         super(line, column);
     }
 
+    /** SimpleDeclaration : VariableDeclaration | TypeDeclaration */
     public static Declaration parseSimple(Parser p) {
         return switch (p.getCurrent().type()) {
             case VAR -> VariableDeclaration.parse(p);

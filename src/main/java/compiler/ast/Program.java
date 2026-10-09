@@ -1,8 +1,9 @@
 package compiler.ast;
 
+import compiler.ast.declaration.Declaration;
+import compiler.ast.declaration.RoutineDeclaration;
 import java.util.ArrayList;
 import java.util.List;
-
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
 
@@ -15,6 +16,7 @@ public class Program extends Node {
         this.declarations = declarations;
     }
 
+    /** Program : { SimpleDeclaration | RoutineDeclaration } */
     public static Program parse(Parser p) {
         int line = p.getCurrent().line();
         int column = p.getCurrent().column();

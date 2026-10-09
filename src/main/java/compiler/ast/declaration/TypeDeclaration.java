@@ -1,5 +1,6 @@
-package compiler.ast;
+package compiler.ast.declaration;
 
+import compiler.ast.type.TypeNode;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;

@@ -1,8 +1,9 @@
 package compiler.ast;
 
+import compiler.ast.declaration.Declaration;
+import compiler.ast.statement.Statement;
 import java.util.ArrayList;
 import java.util.List;
-
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
 
