@@ -33,6 +33,7 @@ public enum TokenType {
     LBRACKET, RBRACKET,
     PLUS, MINUS, STAR, SLASH, PERCENT,
     LT, LE, GT, GE, EQ, NEQ,
+    ARROW,         // =>
 
     // structural
     NEWLINE,
