@@ -4,13 +4,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MainTest {
-
-    @TempDir Path tempDir;
 
     @Test
     void printsAstForWholeSourceFile() throws Exception {
@@ -25,8 +22,7 @@ class MainTest {
 
     @Test
     void printsEveryRecoveredSyntaxErrorWithoutPartialTree() throws Exception {
-        Path source = tempDir.resolve("broken.i");
-        Files.writeString(source, "var first\nvar second\n");
+        Path source = Path.of("prog-examples/test-cases/recovery-cli.i");
         Result result = launch(source);
 
         assertEquals(1, result.status());

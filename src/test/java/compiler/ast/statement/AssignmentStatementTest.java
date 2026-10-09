@@ -2,6 +2,7 @@ package compiler.ast.statement;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import compiler.TestPrograms;
 import compiler.ast.Program;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.expression.accessor.FieldAccess;
@@ -42,13 +43,8 @@ class AssignmentStatementTest {
 
     @Test
     void worksInsideRoutineBody() {
-        Program program = Program.parse(new Parser(new Lexer("""
-                routine change(value: integer) is
-                    var x is value
-                    x := x + 10
-                    print x
-                end
-                """)));
+        Program program = Program.parse(new Parser(new Lexer(
+                TestPrograms.read("assignment-in-routine.i"))));
         RoutineDeclaration routine = assertInstanceOf(RoutineDeclaration.class,
                 program.declarations.get(0));
 

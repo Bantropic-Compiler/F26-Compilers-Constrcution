@@ -2,6 +2,7 @@ package compiler.ast.statement;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import compiler.TestPrograms;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.declaration.VariableDeclaration;
 import compiler.ast.expression.expression.BinaryExpression;
@@ -30,20 +31,7 @@ class IfStatementTest {
 
     @Test
     void parsesElseAndNestedIfWithinRoutine() {
-        Parser p = new Parser(new Lexer("""
-                routine demo() is
-                    if true then
-                        var x is 1
-                        if false then
-                            print 2
-                        else
-                            print 3
-                        end
-                    else
-                        return
-                    end
-                end
-                """));
+        Parser p = new Parser(new Lexer(TestPrograms.read("nested-if.i")));
         RoutineDeclaration routine = RoutineDeclaration.parse(p);
         IfStatement outer = assertInstanceOf(IfStatement.class, routine.body.items.get(0));
 

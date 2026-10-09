@@ -2,6 +2,7 @@ package compiler.ast.statement;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import compiler.TestPrograms;
 import compiler.ast.Program;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.expression.ModifiablePrimaryNode;
@@ -42,14 +43,8 @@ class ForStatementTest {
 
     @Test
     void parsesReverseRangeInsideRoutine() {
-        Program program = Program.parse(new Parser(new Lexer("""
-                routine countdown() is
-                    for i in 5..1 reverse loop
-                        print i
-                    end
-                    print 0
-                end
-                """)));
+        Program program = Program.parse(new Parser(new Lexer(
+                TestPrograms.read("reverse-range.i"))));
         RoutineDeclaration routine = assertInstanceOf(RoutineDeclaration.class,
                 program.declarations.get(0));
         ForStatement loop = assertInstanceOf(ForStatement.class, routine.body.items.get(0));

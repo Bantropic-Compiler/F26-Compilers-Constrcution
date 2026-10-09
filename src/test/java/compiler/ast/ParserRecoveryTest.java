@@ -1,5 +1,6 @@
 package compiler.ast;
 
+import compiler.TestPrograms;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.declaration.TypeDeclaration;
 import compiler.ast.declaration.VariableDeclaration;
@@ -16,7 +17,7 @@ class ParserRecoveryTest {
 
     @Test
     void collectsIndependentDeclarationErrorsAndKeepsLaterDeclarations() {
-        Parser p = new Parser(new Lexer("var first\nvar kept: integer\ntype Broken is\nvar also: integer\n"));
+        Parser p = new Parser(new Lexer(TestPrograms.read("recovery-declarations.i")));
 
         Program program = Program.parse(p);
 
@@ -31,9 +32,7 @@ class ParserRecoveryTest {
 
     @Test
     void recoversInsideRoutineBodyAndContinuesAfterRoutine() {
-        Parser p = new Parser(new Lexer("routine work() is\n"
-                + "var bad\nvar a: integer\n) stray\nvar b: integer\nend\n"
-                + "type After is integer\n"));
+        Parser p = new Parser(new Lexer(TestPrograms.read("recovery-routine.i")));
 
         Program program = Program.parse(p);
 
@@ -50,8 +49,7 @@ class ParserRecoveryTest {
 
     @Test
     void recoversRecordMembersWithoutDiscardingTheType() {
-        Parser p = new Parser(new Lexer("type Pair is record\nvar bad\n"
-                + "var good: integer\nend\ntype After is integer"));
+        Parser p = new Parser(new Lexer(TestPrograms.read("recovery-record-member.i")));
 
         Program program = Program.parse(p);
 
@@ -64,7 +62,7 @@ class ParserRecoveryTest {
 
     @Test
     void malformedTokenAtSyncPointAndUnclosedRecordReachEof() {
-        Parser p = new Parser(new Lexer("end\ntype Broken is record\nvar x: integer"));
+        Parser p = new Parser(new Lexer(TestPrograms.read("recovery-unclosed-record.i")));
 
         Program program = assertTimeoutPreemptively(Duration.ofSeconds(1), () -> Program.parse(p));
 
@@ -75,8 +73,7 @@ class ParserRecoveryTest {
 
     @Test
     void missingRecordEndLeavesNextDeclarationStarterAvailable() {
-        Parser p = new Parser(new Lexer("type Broken is record\n"
-                + "var x: integer\ntype After is integer"));
+        Parser p = new Parser(new Lexer(TestPrograms.read("recovery-next-declaration.i")));
 
         Program program = Program.parse(p);
 

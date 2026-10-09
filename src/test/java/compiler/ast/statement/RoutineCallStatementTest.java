@@ -2,6 +2,7 @@ package compiler.ast.statement;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import compiler.TestPrograms;
 import compiler.ast.Program;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.expression.expression.BinaryExpression;
@@ -39,14 +40,8 @@ class RoutineCallStatementTest {
 
     @Test
     void callAndAssignmentShareIdentifierDispatch() {
-        Program program = Program.parse(new Parser(new Lexer("""
-                routine demo() is
-                    var x is 1
-                    show(x)
-                    x := 2
-                    show
-                end
-                """)));
+        Program program = Program.parse(new Parser(new Lexer(
+                TestPrograms.read("call-assignment-dispatch.i"))));
         RoutineDeclaration routine = assertInstanceOf(RoutineDeclaration.class,
                 program.declarations.get(0));
 

@@ -2,6 +2,7 @@ package compiler.ast.statement;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import compiler.TestPrograms;
 import compiler.ast.Program;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.expression.expression.BinaryExpression;
@@ -31,17 +32,8 @@ class WhileStatementTest {
 
     @Test
     void handlesNestedBlocksAndLoopControlStatements() {
-        Program program = Program.parse(new Parser(new Lexer("""
-                routine search() is
-                    while true loop
-                        if done then
-                            break
-                        end
-                        continue
-                    end
-                    print 1
-                end
-                """)));
+        Program program = Program.parse(new Parser(new Lexer(
+                TestPrograms.read("nested-loop-control.i"))));
         RoutineDeclaration routine = assertInstanceOf(RoutineDeclaration.class,
                 program.declarations.get(0));
         WhileStatement loop = assertInstanceOf(WhileStatement.class, routine.body.items.get(0));
