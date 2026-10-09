@@ -5,7 +5,9 @@ import compiler.ast.statement.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import compiler.lexer.TokenType;
+import compiler.lexer.Token;
 import compiler.parser.Parser;
+import compiler.parser.ParserException;
 
 /**
  * Body : { SimpleDeclaration | Statement }
@@ -27,10 +29,19 @@ public class BlockNode extends Node {
 
         p.skipSeparators();
         while (!p.check(TokenType.END) && !p.check(TokenType.ELSE) && !p.check(TokenType.EOF)) {
-            if (p.check(TokenType.VAR) || p.check(TokenType.TYPE)) {
-                items.add(Declaration.parseSimple(p));
-            } else {
-                items.add(Statement.parse(p));
+            Token start = p.getCurrent();
+            boolean declaration = p.check(TokenType.VAR) || p.check(TokenType.TYPE);
+            try {
+                if (declaration) {
+                    items.add(Declaration.parseSimple(p));
+                } else {
+                    items.add(Statement.parse(p));
+                }
+            } catch (ParserException error) {
+                p.report(error);
+                if (p.getCurrent() == start) p.advance();
+                if (declaration) p.synchronizeDeclaration();
+                else p.synchronizeStatement();
             }
             p.skipSeparators();
         }

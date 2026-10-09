@@ -1,0 +1,33 @@
+Program
+  declarations:
+    TypeDeclaration
+      name: "Count"
+      type:
+        PrimitiveTypeNode
+          kind: INTEGER
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "value"
+              name: "count"
+              type:
+                TypeReferenceNode
+                  name: "Count"
+            PrintStatement
+              args:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "count"
+      name: "showCount"
+      parameters:
+        Parameter
+          name: "value"
+          type:
+            TypeReferenceNode
+              name: "Count"
+      returnType: null

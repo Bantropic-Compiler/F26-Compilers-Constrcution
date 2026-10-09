@@ -1,0 +1,41 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "value"
+              name: "x"
+              type: null
+            AssignmentStatement
+              target:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "x"
+              value:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "x"
+                  op: PLUS
+                  right:
+                    IntegerLiteral
+                      value: 10
+            PrintStatement
+              args:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "x"
+      name: "change"
+      parameters:
+        Parameter
+          name: "value"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType: null

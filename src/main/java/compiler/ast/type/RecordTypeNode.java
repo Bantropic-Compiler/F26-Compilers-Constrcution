@@ -6,6 +6,7 @@ import java.util.List;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
+import compiler.parser.ParserException;
 
 public class RecordTypeNode extends TypeNode {
 
@@ -20,8 +21,14 @@ public class RecordTypeNode extends TypeNode {
         Token start = p.expect(TokenType.RECORD);
         p.skipSeparators();
         List<VariableDeclaration> members = new ArrayList<>();
-        while (!p.check(TokenType.END)) {
-            members.add(VariableDeclaration.parse(p));
+        while (!p.check(TokenType.END) && !p.check(TokenType.EOF)
+                && !p.check(TokenType.TYPE) && !p.check(TokenType.ROUTINE)) {
+            try {
+                members.add(VariableDeclaration.parse(p));
+            } catch (ParserException error) {
+                p.report(error);
+                p.synchronizeDeclaration();
+            }
             p.skipSeparators();
         }
         p.expect(TokenType.END);

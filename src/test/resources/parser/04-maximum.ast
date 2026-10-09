@@ -1,0 +1,47 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            IfStatement
+              condition:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "a"
+                  op: GT
+                  right:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "b"
+              elseBody:
+                BlockNode
+                  items:
+                    PrintStatement
+                      args:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "b"
+              thenBody:
+                BlockNode
+                  items:
+                    PrintStatement
+                      args:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "a"
+      name: "maximum"
+      parameters:
+        Parameter
+          name: "a"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+        Parameter
+          name: "b"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType: null

@@ -3,7 +3,7 @@ package compiler.ast.declaration;
 import compiler.ast.BlockNode;
 import compiler.ast.Node;
 import compiler.ast.expression.Expression;
-import compiler.ast.statement.ReturnStatement;
+import compiler.ast.statement.routine.ReturnStatement;
 import compiler.ast.type.TypeNode;
 import java.util.ArrayList;
 import java.util.List;

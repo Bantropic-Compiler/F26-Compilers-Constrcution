@@ -1,0 +1,77 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            VariableDeclaration
+              initializer:
+                IntegerLiteral
+                  value: 0
+              name: "total"
+              type: null
+            VariableDeclaration
+              initializer:
+                IntegerLiteral
+                  value: 1
+              name: "i"
+              type: null
+            WhileStatement
+              body:
+                BlockNode
+                  items:
+                    AssignmentStatement
+                      target:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "total"
+                      value:
+                        BinaryExpression
+                          left:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "total"
+                          op: PLUS
+                          right:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "i"
+                    AssignmentStatement
+                      target:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "i"
+                      value:
+                        BinaryExpression
+                          left:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "i"
+                          op: PLUS
+                          right:
+                            IntegerLiteral
+                              value: 1
+              condition:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "i"
+                  op: LE
+                  right:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "n"
+            PrintStatement
+              args:
+                ModifiablePrimaryNode
+                  accessors: []
+                  base: "total"
+      name: "sumTo"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType: null

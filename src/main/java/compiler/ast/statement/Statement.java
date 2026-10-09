@@ -1,14 +1,17 @@
 package compiler.ast.statement;
 
 import compiler.ast.Node;
+import compiler.ast.statement.loop.BreakStatement;
+import compiler.ast.statement.loop.ContinueStatement;
+import compiler.ast.statement.loop.ForStatement;
+import compiler.ast.statement.loop.WhileStatement;
+import compiler.ast.statement.routine.ReturnStatement;
+import compiler.ast.statement.routine.RoutineCallStatement;
+import compiler.lexer.Token;
 import compiler.parser.Parser;
+import compiler.parser.ParserException;
 
-/**
- * Stub so BlockNode compiles against Statement before the real
- * dispatcher (Assignment/RoutineCall/While/For/If/Print/...) is written.
- * ReturnStatement is implemented already (see ReturnStatement.java) —
- * Stage 5 needed it for desugaring "=> Expression".
- */
+/** Common base and dispatcher for statements in a block. */
 public abstract class Statement extends Node {
 
     protected Statement(int line, int column) {
@@ -16,6 +19,23 @@ public abstract class Statement extends Node {
     }
 
     public static Statement parse(Parser p) {
-        throw new UnsupportedOperationException("Statement.parse() — Stage 4 (Arsen)");
+        return switch (p.getCurrent().type()) {
+            case PRINT -> PrintStatement.parse(p);
+            case RETURN -> ReturnStatement.parse(p);
+            case BREAK -> BreakStatement.parse(p);
+            case CONTINUE -> ContinueStatement.parse(p);
+            case IF -> IfStatement.parse(p);
+            case WHILE -> WhileStatement.parse(p);
+            case FOR -> ForStatement.parse(p);
+            case IDENTIFIER -> {
+                Token name = p.advance();
+                yield RoutineCallStatement.isCallAfterName(p.getCurrent().type())
+                        ? RoutineCallStatement.parse(p, name)
+                        : AssignmentStatement.parse(p, name);
+            }
+            default -> throw new ParserException(
+                    "expected a statement but found " + p.getCurrent().type(),
+                    p.getCurrent().line(), p.getCurrent().column());
+        };
     }
 }

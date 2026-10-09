@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.Test;
 
+import compiler.ast.statement.routine.ReturnStatement;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
 

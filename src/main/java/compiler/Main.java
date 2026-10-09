@@ -1,39 +1,41 @@
 package compiler;
 
+import compiler.ast.Program;
 import compiler.lexer.Lexer;
 import compiler.lexer.LexerException;
-import compiler.lexer.Token;
-import compiler.lexer.TokenType;
-
+import compiler.parser.Parser;
+import compiler.parser.ParserException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Reads a .i source file passed as an argument and prints its token
- * stream (line:column, type, lexeme) — used for the live demo.
- */
+/** Reads an I source file and prints its AST, or syntax errors, to the console. */
 public class Main {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         if (args.length != 1) {
             System.err.println("usage: Main <path-to-.i-file>");
+            System.exit(2);
             return;
         }
 
-        String source = Files.readString(Path.of(args[0]));
-        Lexer lexer = new Lexer(source);
+        try {
+            String source = Files.readString(Path.of(args[0]));
+            Parser parser = new Parser(new Lexer(source));
+            Program program = Program.parse(parser);
 
-        while (true) {
-            try {
-                Token token = lexer.nextToken();
-                System.out.printf("%3d:%-3d %-15s %s%n",
-                        token.line(), token.column(), token.type(), token.lexeme());
-                if (token.type() == TokenType.EOF) return;
-            } catch (LexerException error) {
-                System.err.println(error.getMessage());
-                lexer.recover();
+            if (!parser.getErrors().isEmpty()) {
+                for (ParserException error : parser.getErrors()) {
+                    System.err.println(error.getMessage());
+                }
+                System.exit(1);
+                return;
             }
+
+            System.out.print(program.describe());
+        } catch (IOException | LexerException | ParserException error) {
+            System.err.println(error.getMessage());
+            System.exit(1);
         }
     }
 }

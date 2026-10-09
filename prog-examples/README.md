@@ -16,6 +16,10 @@ These are source programs for the Bantropic compiler project, not Java or Jasmin
 
 Output values are specified independently of whitespace: exact print formatting is still to be defined.
 
+## Test cases
+
+`test-cases/` contains source files used by focused parser and command-line tests, including intentionally invalid programs for error recovery. The lexer and AST golden-file tests scan only `.i` files directly in `prog-examples/`; they do not scan this subdirectory.
+
 ## Scope of this collection
 
 The collection contains seven independent programs covering output, variable declaration, reassignment, conditionals, function calls, a while loop, and type aliases.

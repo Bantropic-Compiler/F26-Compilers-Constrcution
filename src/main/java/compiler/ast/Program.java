@@ -5,7 +5,9 @@ import compiler.ast.declaration.RoutineDeclaration;
 import java.util.ArrayList;
 import java.util.List;
 import compiler.lexer.TokenType;
+import compiler.lexer.Token;
 import compiler.parser.Parser;
+import compiler.parser.ParserException;
 
 public class Program extends Node {
 
@@ -24,10 +26,18 @@ public class Program extends Node {
 
         p.skipSeparators();
         while (!p.check(TokenType.EOF)) {
-            if (p.check(TokenType.ROUTINE)) {
-                declarations.add(RoutineDeclaration.parse(p));
-            } else {
-                declarations.add(Declaration.parseSimple(p));
+            Token start = p.getCurrent();
+            try {
+                if (p.check(TokenType.ROUTINE)) {
+                    declarations.add(RoutineDeclaration.parse(p));
+                } else {
+                    declarations.add(Declaration.parseSimple(p));
+                }
+            } catch (ParserException error) {
+                p.report(error);
+                // An invalid token already at a sync point must not be retried forever.
+                if (p.getCurrent() == start) p.advance();
+                p.synchronizeDeclaration();
             }
             p.skipSeparators();
         }

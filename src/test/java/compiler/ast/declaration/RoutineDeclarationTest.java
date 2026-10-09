@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import compiler.lexer.Lexer;
+import compiler.ast.statement.routine.ReturnStatement;
+import compiler.ast.expression.expression.BinaryExpression;
+import compiler.lexer.TokenType;
 import compiler.parser.Parser;
 
 class RoutineDeclarationTest {
@@ -63,6 +66,13 @@ class RoutineDeclarationTest {
         assertInstanceOf(TypeDeclaration.class, r.body.items.get(1));
     }
 
-    // "=> Expression" form needs Expression.parse(). Any body containing an
-    // actual statement also needs Statement.parse().
+    @Test
+    void expressionBodyBecomesReturnStatement() {
+        RoutineDeclaration routine = RoutineDeclaration.parse(new Parser(new Lexer(
+                "routine square(x: integer): integer => x * x")));
+
+        assertEquals(1, routine.body.items.size());
+        ReturnStatement result = assertInstanceOf(ReturnStatement.class, routine.body.items.get(0));
+        assertEquals(TokenType.STAR, assertInstanceOf(BinaryExpression.class, result.value).op);
+    }
 }

@@ -1,0 +1,86 @@
+Program
+  declarations:
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            IfStatement
+              condition:
+                BinaryExpression
+                  left:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "n"
+                  op: LE
+                  right:
+                    IntegerLiteral
+                      value: 1
+              elseBody: null
+              thenBody:
+                BlockNode
+                  items:
+                    ReturnStatement
+                      value:
+                        ModifiablePrimaryNode
+                          accessors: []
+                          base: "n"
+            ReturnStatement
+              value:
+                BinaryExpression
+                  left:
+                    RoutineCallExpression
+                      args:
+                        BinaryExpression
+                          left:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "n"
+                          op: MINUS
+                          right:
+                            IntegerLiteral
+                              value: 1
+                      name: "fibonacci"
+                  op: PLUS
+                  right:
+                    RoutineCallExpression
+                      args:
+                        BinaryExpression
+                          left:
+                            ModifiablePrimaryNode
+                              accessors: []
+                              base: "n"
+                          op: MINUS
+                          right:
+                            IntegerLiteral
+                              value: 2
+                      name: "fibonacci"
+      name: "fibonacci"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType:
+        PrimitiveTypeNode
+          kind: INTEGER
+    RoutineDeclaration
+      body:
+        BlockNode
+          items:
+            PrintStatement
+              args:
+                RoutineCallExpression
+                  args:
+                    ModifiablePrimaryNode
+                      accessors: []
+                      base: "n"
+                  name: "fibonacci"
+      name: "showFibonacci"
+      parameters:
+        Parameter
+          name: "n"
+          type:
+            PrimitiveTypeNode
+              kind: INTEGER
+      returnType: null
