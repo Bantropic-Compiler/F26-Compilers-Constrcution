@@ -27,12 +27,10 @@ public class UnaryExpression extends Expression {
         }
         Token operator = p.advance();
 
-        // The source grammar allows "not" only before an integer literal, while its
-        // prose describes Boolean negation. Keep this branch disabled until clarified.
-        // if (operator.type() == TokenType.NOT) {
-        //     return new UnaryExpression(operator.line(), operator.column(), operator.type(),
-        //             IntegerLiteral.parse(p));
-        // }
+        if (operator.type() == TokenType.NOT) {
+            return new UnaryExpression(operator.line(), operator.column(), operator.type(),
+                    IntegerLiteral.parse(p));
+        }
         
         Expression operand = switch (p.getCurrent().type()) {
             case INTEGER_LITERAL -> IntegerLiteral.parse(p);

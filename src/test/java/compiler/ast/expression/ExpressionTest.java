@@ -14,7 +14,7 @@ import compiler.ast.expression.literal.CharLiteral;
 import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.ast.expression.literal.RealLiteral;
 import compiler.ast.expression.literal.StringLiteral;
-import compiler.ast.statement.ReturnStatement;
+import compiler.ast.statement.routine.ReturnStatement;
 import compiler.ast.type.ArrayTypeNode;
 import compiler.ast.type.TypeNode;
 import compiler.lexer.Lexer;

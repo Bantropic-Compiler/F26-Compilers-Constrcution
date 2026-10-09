@@ -25,7 +25,7 @@ public class ModifiablePrimaryNode extends Expression {
         return parse(p, p.expect(TokenType.IDENTIFIER));
     }
 
-    static ModifiablePrimaryNode parse(Parser p, Token name) {
+    public static ModifiablePrimaryNode parse(Parser p, Token name) {
         List<Accessor> accessors = new ArrayList<>();
         while (p.check(TokenType.DOT) || p.check(TokenType.LBRACKET)) {
             accessors.add(p.check(TokenType.DOT) ? FieldAccess.parse(p) : IndexAccess.parse(p));
