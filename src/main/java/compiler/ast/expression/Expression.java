@@ -4,7 +4,6 @@ import compiler.ast.Node;
 import compiler.parser.Parser;
 
 /**
- * Stage 3 — owner: Arsen.
  * Stub so the rest of the AST compiles against Expression before the
  * real hierarchy (BinaryExpression, literals, ModifiablePrimaryNode,
  * RoutineCallExpression, ...) is written.

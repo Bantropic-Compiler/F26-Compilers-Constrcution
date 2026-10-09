@@ -1,13 +1,16 @@
 package compiler.ast.declaration;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
+
 import compiler.ast.type.PrimitiveTypeNode;
 import compiler.ast.type.TypeReferenceNode;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
 import compiler.parser.ParserException;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class VariableDeclarationTest {
 
@@ -37,6 +40,5 @@ class VariableDeclarationTest {
         assertThrows(ParserException.class, () -> VariableDeclaration.parse(p));
     }
 
-    // "var x is <expr>" and "var x: Type is <expr>" need Expression.parse()
-    // (Stage 3, Arsen) — add once that's in.
+    // "var x is <expr>" and "var x: Type is <expr>" need Expression.parse().
 }

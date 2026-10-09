@@ -1,14 +1,16 @@
 package compiler.ast.declaration;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import org.junit.jupiter.api.Test;
+
 import compiler.ast.type.ArrayTypeNode;
 import compiler.ast.type.PrimitiveTypeNode;
 import compiler.ast.type.RecordTypeNode;
 import compiler.ast.type.StringTypeNode;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class TypeDeclarationTest {
 
@@ -51,6 +53,5 @@ class TypeDeclarationTest {
         assertInstanceOf(StringTypeNode.class, decl.type);
     }
 
-    // sized array types ("array[3] integer") need Expression.parse()
-    // (Stage 3, Arsen) — add once that's in.
+    // sized array types ("array[3] integer") need Expression.parse().
 }

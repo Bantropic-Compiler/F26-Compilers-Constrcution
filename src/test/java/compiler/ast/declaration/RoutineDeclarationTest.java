@@ -1,10 +1,14 @@
 package compiler.ast.declaration;
 
-import compiler.lexer.Lexer;
-import compiler.parser.Parser;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import compiler.lexer.Lexer;
+import compiler.parser.Parser;
 
 class RoutineDeclarationTest {
 
@@ -59,7 +63,6 @@ class RoutineDeclarationTest {
         assertInstanceOf(TypeDeclaration.class, r.body.items.get(1));
     }
 
-    // "=> Expression" form needs Expression.parse() (Stage 3, Arsen) — add
-    // once that's in. Any body containing an actual statement also needs
-    // Statement.parse() (Stage 4, Arsen).
+    // "=> Expression" form needs Expression.parse(). Any body containing an
+    // actual statement also needs Statement.parse().
 }
