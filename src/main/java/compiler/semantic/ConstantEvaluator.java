@@ -4,6 +4,8 @@ import compiler.ast.expression.Expression;
 import compiler.ast.expression.expression.BinaryExpression;
 import compiler.ast.expression.expression.UnaryExpression;
 import compiler.ast.expression.literal.IntegerLiteral;
+import compiler.ast.expression.literal.RealLiteral;
+import compiler.semantic.type.PrimitiveType;
 
 public final class ConstantEvaluator {
 
@@ -21,6 +23,55 @@ public final class ConstantEvaluator {
         } catch (ArithmeticException overflow) {
             return null;
         }
+    }
+
+    /** Numeric constant value, preserving integer division and rejecting overflow. */
+    public static Double numericValue(Expression expression, SemanticModel model) {
+        if (!model.typeOf(expression).isNumeric()) {
+            return null;
+        }
+        Double value;
+        if (expression instanceof IntegerLiteral literal) {
+            value = (double) literal.value;
+        } else if (expression instanceof RealLiteral literal) {
+            value = literal.value;
+        } else if (expression instanceof UnaryExpression unary) {
+            Double operand = numericValue(unary.operand, model);
+            if (operand == null) {
+                return null;
+            }
+            value = switch (unary.op) {
+                case PLUS -> operand;
+                case MINUS -> -operand;
+                default -> null;
+            };
+        } else if (expression instanceof BinaryExpression binary) {
+            Double left = numericValue(binary.left, model);
+            Double right = numericValue(binary.right, model);
+            if (left == null || right == null) {
+                return null;
+            }
+            value = switch (binary.op) {
+                case PLUS -> left + right;
+                case MINUS -> left - right;
+                case STAR -> left * right;
+                case SLASH -> right == 0.0 ? null : left / right;
+                case PERCENT -> right == 0.0 ? null : left % right;
+                default -> null;
+            };
+        } else {
+            return null;
+        }
+        if (value == null || !Double.isFinite(value)) {
+            return null;
+        }
+        if (model.typeOf(expression) == PrimitiveType.INTEGER) {
+            value = value < 0 ? Math.ceil(value) : Math.floor(value);
+            if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+                return null;
+            }
+        }
+        return value;
     }
 
     private static Long evaluate(Expression expression) {
