@@ -8,9 +8,9 @@ import compiler.parser.Parser;
 
 public class ReturnStatement extends Statement {
 
-    public final Expression value; // nullable
+    public Expression value; // nullable
 
-    private ReturnStatement(int line, int column, Expression value) {
+    public ReturnStatement(int line, int column, Expression value) {
         super(line, column);
         this.value = value;
     }

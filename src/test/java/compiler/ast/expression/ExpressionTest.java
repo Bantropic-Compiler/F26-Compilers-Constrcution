@@ -80,7 +80,9 @@ class ExpressionTest {
         assertEquals(TokenType.PLUS, assertInstanceOf(UnaryExpression.class, parseWhole("+5")).op);
         UnaryExpression real = assertInstanceOf(UnaryExpression.class, parseWhole("-1.5"));
         assertEquals(1.5, assertInstanceOf(RealLiteral.class, real.operand).value);
-        assertThrows(ParserException.class, () -> parseWhole("not 5"));
+        UnaryExpression not = assertInstanceOf(UnaryExpression.class, parseWhole("not 5"));
+        assertEquals(TokenType.NOT, not.op);
+        assertEquals(5, assertInstanceOf(IntegerLiteral.class, not.operand).value);
         assertThrows(ParserException.class, () -> parseWhole("not true"));
         assertThrows(ParserException.class, () -> parseWhole("not flag"));
         assertThrows(ParserException.class, () -> parseWhole("-value"));

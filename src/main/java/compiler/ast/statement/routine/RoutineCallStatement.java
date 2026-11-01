@@ -7,6 +7,7 @@ import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
 import compiler.parser.ParserException;
+import java.util.ArrayList;
 import java.util.List;
 
 /** A routine invocation used as a statement; its result, if any, is discarded. */
@@ -15,10 +16,10 @@ public class RoutineCallStatement extends Statement {
     public final String name;
     public final List<Expression> args;
 
-    private RoutineCallStatement(int line, int column, String name, List<Expression> args) {
+    public RoutineCallStatement(int line, int column, String name, List<Expression> args) {
         super(line, column);
         this.name = name;
-        this.args = List.copyOf(args);
+        this.args = new ArrayList<>(args);
     }
 
     public static RoutineCallStatement parse(Parser p) {

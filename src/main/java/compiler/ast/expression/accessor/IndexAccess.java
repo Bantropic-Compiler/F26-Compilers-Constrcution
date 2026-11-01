@@ -8,9 +8,9 @@ import compiler.parser.Parser;
 
 public class IndexAccess extends Accessor {
 
-    public final Expression index;
+    public Expression index;
 
-    private IndexAccess(int line, int column, Expression index) {
+    public IndexAccess(int line, int column, Expression index) {
         super(line, column);
         this.index = index;
     }

@@ -11,9 +11,9 @@ import compiler.parser.ParserException;
 public class UnaryExpression extends Expression {
 
     public final TokenType op;
-    public final Expression operand;
+    public Expression operand;
 
-    private UnaryExpression(int line, int column, TokenType op, Expression operand) {
+    public UnaryExpression(int line, int column, TokenType op, Expression operand) {
         super(line, column);
         this.op = op;
         this.operand = operand;
@@ -21,8 +21,8 @@ public class UnaryExpression extends Expression {
 
     /** Signs precede integer or real literals. */
     public static UnaryExpression parse(Parser p) {
-        if (!p.check(TokenType.PLUS) && !p.check(TokenType.MINUS)) {
-            throw new ParserException("expected + or - before a numeric literal",
+        if (!p.check(TokenType.PLUS) && !p.check(TokenType.MINUS) && !p.check(TokenType.NOT)) {
+            throw new ParserException("expected +, - or not before a numeric literal",
                     p.getCurrent().line(), p.getCurrent().column());
         }
         Token operator = p.advance();

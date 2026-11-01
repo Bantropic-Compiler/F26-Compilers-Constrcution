@@ -76,7 +76,7 @@ public abstract class Expression extends Node {
             case TRUE, FALSE -> BooleanLiteral.parse(p);
             case CHAR_LITERAL -> CharLiteral.parse(p);
             case STRING_LITERAL -> StringLiteral.parse(p);
-            case PLUS, MINUS -> UnaryExpression.parse(p);
+            case PLUS, MINUS, NOT -> UnaryExpression.parse(p);
             case IDENTIFIER -> {
                 p.advance();
                 yield p.check(TokenType.LPAREN)

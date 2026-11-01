@@ -10,10 +10,10 @@ import compiler.parser.Parser;
 /** while Expression loop Body end */
 public class WhileStatement extends Statement {
 
-    public final Expression condition;
+    public Expression condition;
     public final BlockNode body;
 
-    private WhileStatement(int line, int column, Expression condition, BlockNode body) {
+    public WhileStatement(int line, int column, Expression condition, BlockNode body) {
         super(line, column);
         this.condition = condition;
         this.body = body;

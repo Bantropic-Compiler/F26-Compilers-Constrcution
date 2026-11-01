@@ -12,7 +12,7 @@ public class RecordTypeNode extends TypeNode {
 
     public final List<VariableDeclaration> members;
 
-    private RecordTypeNode(int line, int column, List<VariableDeclaration> members) {
+    public RecordTypeNode(int line, int column, List<VariableDeclaration> members) {
         super(line, column);
         this.members = members;
     }

@@ -12,13 +12,13 @@ import compiler.parser.Parser;
 /** An identifier followed by zero or more field and index accesses. */
 public class ModifiablePrimaryNode extends Expression {
 
-    public final String base;
+    public String base;
     public final List<Accessor> accessors;
 
-    private ModifiablePrimaryNode(int line, int column, String base, List<Accessor> accessors) {
+    public ModifiablePrimaryNode(int line, int column, String base, List<Accessor> accessors) {
         super(line, column);
         this.base = base;
-        this.accessors = List.copyOf(accessors);
+        this.accessors = new ArrayList<>(accessors);
     }
 
     public static ModifiablePrimaryNode parse(Parser p) {

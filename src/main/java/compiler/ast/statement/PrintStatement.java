@@ -12,9 +12,9 @@ public class PrintStatement extends Statement {
 
     public final List<Expression> args;
 
-    private PrintStatement(int line, int column, List<Expression> args) {
+    public PrintStatement(int line, int column, List<Expression> args) {
         super(line, column);
-        this.args = List.copyOf(args);
+        this.args = new ArrayList<>(args);
     }
 
     public static PrintStatement parse(Parser p) {

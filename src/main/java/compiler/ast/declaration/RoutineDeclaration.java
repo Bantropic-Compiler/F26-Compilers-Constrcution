@@ -18,7 +18,7 @@ public class RoutineDeclaration extends Declaration {
     public final TypeNode returnType; // nullable
     public final BlockNode body;      // null = forward declaration
 
-    private RoutineDeclaration(int line, int column, String name, List<Parameter> parameters,
+    public RoutineDeclaration(int line, int column, String name, List<Parameter> parameters,
                                 TypeNode returnType, BlockNode body) {
         super(line, column);
         this.name = name;

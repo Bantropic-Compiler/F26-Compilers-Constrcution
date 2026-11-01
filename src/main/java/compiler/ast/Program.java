@@ -13,7 +13,7 @@ public class Program extends Node {
 
     public final List<Declaration> declarations;
 
-    private Program(int line, int column, List<Declaration> declarations) {
+    public Program(int line, int column, List<Declaration> declarations) {
         super(line, column);
         this.declarations = declarations;
     }

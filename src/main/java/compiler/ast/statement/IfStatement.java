@@ -9,11 +9,11 @@ import compiler.parser.Parser;
 /** if Expression then Body [ else Body ] end */
 public class IfStatement extends Statement {
 
-    public final Expression condition;
+    public Expression condition;
     public final BlockNode thenBody;
     public final BlockNode elseBody; // null when there is no else branch
 
-    private IfStatement(int line, int column, Expression condition,
+    public IfStatement(int line, int column, Expression condition,
                         BlockNode thenBody, BlockNode elseBody) {
         super(line, column);
         this.condition = condition;

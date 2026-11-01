@@ -10,13 +10,13 @@ import compiler.parser.Parser;
 /** for Identifier in Expression [ .. Expression ] [ reverse ] loop Body end */
 public class ForStatement extends Statement {
 
-    public final String loopVar;
-    public final Expression rangeStart;
-    public final Expression rangeEnd; // null for array iteration
+    public String loopVar;
+    public Expression rangeStart;
+    public Expression rangeEnd; // null for array iteration
     public final boolean reverse;
     public final BlockNode body;
 
-    private ForStatement(int line, int column, String loopVar, Expression rangeStart,
+    public ForStatement(int line, int column, String loopVar, Expression rangeStart,
                          Expression rangeEnd, boolean reverse, BlockNode body) {
         super(line, column);
         this.loopVar = loopVar;

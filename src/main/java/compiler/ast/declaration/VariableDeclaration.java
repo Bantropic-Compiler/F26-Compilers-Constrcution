@@ -9,11 +9,11 @@ import compiler.parser.ParserException;
 
 public class VariableDeclaration extends Declaration {
 
-    public final String name;
+    public String name;
     public final TypeNode type;          // nullable
-    public final Expression initializer; // nullable
+    public Expression initializer; // nullable
 
-    private VariableDeclaration(int line, int column, String name, TypeNode type, Expression initializer) {
+    public VariableDeclaration(int line, int column, String name, TypeNode type, Expression initializer) {
         super(line, column);
         this.name = name;
         this.type = type;

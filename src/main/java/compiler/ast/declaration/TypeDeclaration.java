@@ -10,7 +10,7 @@ public class TypeDeclaration extends Declaration {
     public final String name;
     public final TypeNode type;
 
-    private TypeDeclaration(int line, int column, String name, TypeNode type) {
+    public TypeDeclaration(int line, int column, String name, TypeNode type) {
         super(line, column);
         this.name = name;
         this.type = type;
