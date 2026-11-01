@@ -1,5 +1,6 @@
 package compiler.semantic.check;
 
+import static compiler.TestPrograms.read;
 import static compiler.semantic.SemanticTestSupport.diagnostics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -9,79 +10,36 @@ import org.junit.jupiter.api.Test;
 class LoopCheckerTest {
     @Test
     void acceptsIntegerExpressionsReverseEmptyRangesAndArrays() {
-        assertEquals(List.of(), diagnostics("""
-                routine p(n: integer, a: array [] integer) is
-                    for i in n + 1..n reverse loop
-                        print i
-                    end
-                    for x in a loop
-                        print x
-                    end
-                end
-                """));
+        assertEquals(List.of(), diagnostics(read("semantic/loop/accepts-integer-expressions-reverse-empty-ranges-and-arrays.i")));
     }
 
     @Test
     void rejectsBothNonIntegerBounds() {
         assertEquals(List.of(
                 "2:14: for range bound must be integer, found 'real'",
-                "2:19: for range bound must be integer, found 'boolean'"), diagnostics("""
-                routine p() is
-                    for i in 1.5..true loop
-                    end
-                end
-                """));
+                "2:19: for range bound must be integer, found 'boolean'"), diagnostics(read("semantic/loop/rejects-both-non-integer-bounds.i")));
     }
 
     @Test
     void requiresArrayWithoutRange() {
-        assertEquals(List.of("2:14: for iteration requires an array, found 'string'"), diagnostics("""
-                routine p() is
-                    for x in "text" loop
-                    end
-                end
-                """));
+        assertEquals(List.of("2:14: for iteration requires an array, found 'string'"), diagnostics(read("semantic/loop/requires-array-without-range.i")));
     }
 
     @Test
     void rejectsAssignmentsToBothNestedLoopVariables() {
         assertEquals(List.of(
                 "4:13: cannot assign to loop variable 'i'",
-                "5:13: cannot assign to loop variable 'j'"), diagnostics("""
-                routine p() is
-                    for i in 1..3 loop
-                        for j in 1..2 loop
-                            i := 2
-                            j := 1
-                        end
-                    end
-                end
-                """));
+                "5:13: cannot assign to loop variable 'j'"), diagnostics(read("semantic/loop/rejects-assignments-to-both-nested-loop-variables.i")));
     }
 
     @Test
     void permitsAssignmentsToShadowingLocalAndOuterVariableAfterLoop() {
-        assertEquals(List.of(), diagnostics("""
-                routine p() is
-                    var i is 0
-                    for i in 1..3 loop
-                        var i is 5
-                        i := 6
-                    end
-                    i := 1
-                end
-                """));
+        assertEquals(List.of(), diagnostics(read("semantic/loop/permits-assignments-to-shadowing-local-and-outer-variable-after-loop.i")));
     }
 
     @Test
     void arrayIterationVariableIsReadOnlyIncludingItsElements() {
-        assertEquals(List.of("3:9: cannot assign to loop variable 'row'"), diagnostics("""
-                routine p(a: array [] array [2] integer) is
-                    for row in a loop
-                        row[1] := 0
-                    end
-                end
-                """));
+        assertEquals(List.of("3:9: cannot assign to loop variable 'row'"), diagnostics(read("semantic/loop/array-iteration-variable-is-read-only-including-its-elements.i")));
     }
 
     @Test
@@ -89,14 +47,6 @@ class LoopCheckerTest {
         assertEquals(List.of(
                 "2:14: 'missing' is not declared",
                 "3:9: 'unknown' is not declared",
-                "5:14: 'missing' is not declared"), diagnostics("""
-                routine p() is
-                    for i in missing..3 loop
-                        unknown := 1
-                    end
-                    for x in missing loop
-                    end
-                end
-                """));
+                "5:14: 'missing' is not declared"), diagnostics(read("semantic/loop/does-not-cascade-from-unresolved-sources-or-targets.i")));
     }
 }

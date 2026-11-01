@@ -18,7 +18,21 @@ Output values are specified independently of whitespace: exact print formatting 
 
 ## Test cases
 
-`test-cases/` contains source files used by focused parser and command-line tests, including intentionally invalid programs for error recovery. The lexer and AST golden-file tests scan only `.i` files directly in `prog-examples/`; they do not scan this subdirectory.
+`test-cases/` contains source files used by focused parser, semantic analyzer, and command-line tests, including intentionally invalid programs for error recovery. The lexer and AST golden-file tests scan only `.i` files directly in `prog-examples/`; they do not scan this subdirectory.
+
+### Semantic checks
+
+`test-cases/semantic/` contains independent programs for focused semantic tests:
+
+| Directory | Check |
+| --- | --- |
+| `context/` | C1: loop keywords and return forms |
+| `array-bounds/` | C4: array sizes and indices |
+| `loop/` | C5: loop bounds, iteration sources, and loop variable assignments |
+| `division-by-zero/` | C6: constant division and remainder by zero |
+| `return-path/` | C6: return values on every function path |
+
+Java tests load these files with `TestPrograms.read` and check the expected diagnostics. Parameterized tests list case filenames. Keep source whitespace intact when editing cases with line/column assertions.
 
 ## Scope of this collection
 
