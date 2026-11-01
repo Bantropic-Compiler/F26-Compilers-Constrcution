@@ -2,6 +2,7 @@ package compiler.semantic;
 
 import compiler.ast.Program;
 import compiler.semantic.check.Check;
+import compiler.semantic.check.ReturnPathChecker;
 import compiler.semantic.check.DivisionByZeroChecker;
 import compiler.semantic.check.ArrayBoundsChecker;
 import compiler.semantic.check.ContextChecker;
@@ -30,7 +31,8 @@ public final class SemanticAnalyzer {
                     new ContextChecker(),
                     new LoopChecker(),
                     new ArrayBoundsChecker(),
-                    new DivisionByZeroChecker()
+                    new DivisionByZeroChecker(),
+                    new ReturnPathChecker()
                 );
     }
 }
