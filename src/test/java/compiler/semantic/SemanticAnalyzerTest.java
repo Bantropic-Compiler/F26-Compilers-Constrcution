@@ -1,19 +1,20 @@
 package compiler.semantic;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import compiler.TestPrograms;
-import compiler.ast.Program;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import compiler.TestPrograms;
+import compiler.ast.Program;
 
 class SemanticAnalyzerTest {
 
@@ -21,10 +22,6 @@ class SemanticAnalyzerTest {
         try (Stream<Path> files = Files.list(Path.of("prog-examples"))) {
             return files.filter(path -> path.toString().endsWith(".i")).sorted().toList().stream();
         }
-    }
-
-    static Stream<String> negativePrograms() {
-        return Stream.of("semantic-undeclared-and-types", "semantic-forward-mismatch");
     }
 
     @ParameterizedTest
@@ -37,14 +34,24 @@ class SemanticAnalyzerTest {
         assertFalse(result.hasErrors());
     }
 
-    @ParameterizedTest
-    @MethodSource("negativePrograms")
-    void negativeProgramsReportExactlyTheExpectedDiagnostics(String name) throws IOException {
-        SemanticResult result = SemanticTestSupport.analyze(TestPrograms.read(name + ".i"));
-        List<String> expected = Files.readAllLines(Path.of("src/test/resources/semantic", name + ".diagnostics"));
+    @Test
+    void undeclaredNamesAndTypeMismatchesAreAllReported() {
+        assertEquals(List.of(
+                "1:23: cannot initialize 'integer' with 'string'",
+                "2:22: cannot initialize 'boolean' with 'integer'",
+                "5:16: 'hight' is not declared",
+                "9:14: routine 'area' expects 2 argument(s) but 1 given",
+                "10:8: condition of 'if' must be boolean, found 'integer'",
+                "13:5: 'undefined' is not declared"),
+                SemanticTestSupport.diagnostics(TestPrograms.read("semantic-undeclared-and-types.i")));
+    }
 
-        assertTrue(result.hasErrors());
-        assertEquals(expected, result.diagnostics().stream().map(Diagnostic::toString).toList());
+    @Test
+    void forwardDeclarationProblemsAreReported() {
+        assertEquals(List.of(
+                "2:1: routine 'never' is declared but never defined",
+                "4:1: routine 'twice' does not match its forward declaration at 1:1"),
+                SemanticTestSupport.diagnostics(TestPrograms.read("semantic-forward-mismatch.i")));
     }
 
     @Test

@@ -30,7 +30,11 @@ class MainSemanticTest {
         Process process = new ProcessBuilder(command).start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         String errors = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-        return new Result(process.waitFor(), output, errors);
+        return new Result(process.waitFor(), normalize(output), normalize(errors));
+    }
+
+    private static String normalize(String text) {
+        return text.replace("\r\n", "\n");
     }
 
     @Test
