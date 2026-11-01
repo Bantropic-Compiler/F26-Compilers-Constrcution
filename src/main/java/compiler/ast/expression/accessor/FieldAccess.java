@@ -9,7 +9,7 @@ public class FieldAccess extends Accessor {
 
     public final String name;
 
-    private FieldAccess(int line, int column, String name) {
+    public FieldAccess(int line, int column, String name) {
         super(line, column);
         this.name = name;
     }

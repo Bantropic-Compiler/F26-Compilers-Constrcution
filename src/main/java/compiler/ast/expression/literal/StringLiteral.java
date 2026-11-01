@@ -9,7 +9,7 @@ public class StringLiteral extends Expression {
 
     public final String value;
 
-    private StringLiteral(int line, int column, String value) {
+    public StringLiteral(int line, int column, String value) {
         super(line, column);
         this.value = value;
     }

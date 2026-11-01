@@ -7,7 +7,7 @@ import compiler.parser.Parser;
 
 public class BreakStatement extends Statement {
 
-    private BreakStatement(int line, int column) {
+    public BreakStatement(int line, int column) {
         super(line, column);
     }
 

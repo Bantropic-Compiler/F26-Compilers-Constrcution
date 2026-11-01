@@ -7,10 +7,10 @@ import compiler.parser.Parser;
 
 public class ArrayTypeNode extends TypeNode {
 
-    public final Expression sizeExpr; // nullable — sizeless for routine parameters
+    public Expression sizeExpr; // nullable — sizeless for routine parameters
     public final TypeNode elementType;
 
-    private ArrayTypeNode(int line, int column, Expression sizeExpr, TypeNode elementType) {
+    public ArrayTypeNode(int line, int column, Expression sizeExpr, TypeNode elementType) {
         super(line, column);
         this.sizeExpr = sizeExpr;
         this.elementType = elementType;

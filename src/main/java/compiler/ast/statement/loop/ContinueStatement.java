@@ -7,7 +7,7 @@ import compiler.parser.Parser;
 
 public class ContinueStatement extends Statement {
 
-    private ContinueStatement(int line, int column) {
+    public ContinueStatement(int line, int column) {
         super(line, column);
     }
 

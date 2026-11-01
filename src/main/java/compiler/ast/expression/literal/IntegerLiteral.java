@@ -9,7 +9,7 @@ public class IntegerLiteral extends Expression {
 
     public final long value;
 
-    private IntegerLiteral(int line, int column, long value) {
+    public IntegerLiteral(int line, int column, long value) {
         super(line, column);
         this.value = value;
     }

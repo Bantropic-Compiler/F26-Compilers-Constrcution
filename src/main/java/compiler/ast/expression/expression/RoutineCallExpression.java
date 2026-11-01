@@ -13,10 +13,10 @@ public class RoutineCallExpression extends Expression {
     public final String name;
     public final List<Expression> args;
 
-    private RoutineCallExpression(int line, int column, String name, List<Expression> args) {
+    public RoutineCallExpression(int line, int column, String name, List<Expression> args) {
         super(line, column);
         this.name = name;
-        this.args = List.copyOf(args);
+        this.args = new ArrayList<>(args);
     }
 
     public static RoutineCallExpression parse(Parser p) {

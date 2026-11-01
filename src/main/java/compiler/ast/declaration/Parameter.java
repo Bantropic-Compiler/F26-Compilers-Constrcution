@@ -8,10 +8,10 @@ import compiler.parser.Parser;
 
 public class Parameter extends Node {
 
-    public final String name;
+    public String name;
     public final TypeNode type;
 
-    private Parameter(int line, int column, String name, TypeNode type) {
+    public Parameter(int line, int column, String name, TypeNode type) {
         super(line, column);
         this.name = name;
         this.type = type;

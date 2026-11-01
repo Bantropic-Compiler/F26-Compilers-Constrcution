@@ -6,7 +6,7 @@ import compiler.parser.Parser;
 
 public class StringTypeNode extends TypeNode {
 
-    private StringTypeNode(int line, int column) {
+    public StringTypeNode(int line, int column) {
         super(line, column);
     }
 

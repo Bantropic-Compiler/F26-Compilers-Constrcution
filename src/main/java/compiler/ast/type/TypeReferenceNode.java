@@ -8,7 +8,7 @@ public class TypeReferenceNode extends TypeNode {
 
     public final String name;
 
-    private TypeReferenceNode(int line, int column, String name) {
+    public TypeReferenceNode(int line, int column, String name) {
         super(line, column);
         this.name = name;
     }

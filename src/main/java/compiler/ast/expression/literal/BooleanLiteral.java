@@ -9,7 +9,7 @@ public class BooleanLiteral extends Expression {
 
     public final boolean value;
 
-    private BooleanLiteral(int line, int column, boolean value) {
+    public BooleanLiteral(int line, int column, boolean value) {
         super(line, column);
         this.value = value;
     }

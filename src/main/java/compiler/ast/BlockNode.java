@@ -17,7 +17,7 @@ public class BlockNode extends Node {
 
     public final List<Node> items; // Declaration and/or Statement
 
-    private BlockNode(int line, int column, List<Node> items) {
+    public BlockNode(int line, int column, List<Node> items) {
         super(line, column);
         this.items = items;
     }

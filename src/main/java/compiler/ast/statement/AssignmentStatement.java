@@ -10,9 +10,9 @@ import compiler.parser.Parser;
 public class AssignmentStatement extends Statement {
 
     public final ModifiablePrimaryNode target;
-    public final Expression value;
+    public Expression value;
 
-    private AssignmentStatement(int line, int column, ModifiablePrimaryNode target, Expression value) {
+    public AssignmentStatement(int line, int column, ModifiablePrimaryNode target, Expression value) {
         super(line, column);
         this.target = target;
         this.value = value;

@@ -10,7 +10,7 @@ public class PrimitiveTypeNode extends TypeNode {
 
     public final Kind kind;
 
-    private PrimitiveTypeNode(int line, int column, Kind kind) {
+    public PrimitiveTypeNode(int line, int column, Kind kind) {
         super(line, column);
         this.kind = kind;
     }

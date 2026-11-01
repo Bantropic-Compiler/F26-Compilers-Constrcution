@@ -9,7 +9,7 @@ public class CharLiteral extends Expression {
 
     public final int codePoint;
 
-    private CharLiteral(int line, int column, int codePoint) {
+    public CharLiteral(int line, int column, int codePoint) {
         super(line, column);
         this.codePoint = codePoint;
     }

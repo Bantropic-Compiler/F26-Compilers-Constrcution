@@ -7,10 +7,10 @@ import compiler.lexer.TokenType;
 public class BinaryExpression extends Expression {
 
     public final TokenType op;
-    public final Expression left;
-    public final Expression right;
+    public Expression left;
+    public Expression right;
 
-    private BinaryExpression(int line, int column, TokenType op, Expression left, Expression right) {
+    public BinaryExpression(int line, int column, TokenType op, Expression left, Expression right) {
         super(line, column);
         this.op = op;
         this.left = left;
