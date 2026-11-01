@@ -2,6 +2,7 @@ package compiler.semantic;
 
 import compiler.ast.Program;
 import compiler.semantic.check.Check;
+import compiler.semantic.check.ArrayBoundsChecker;
 import compiler.semantic.check.ContextChecker;
 import compiler.semantic.check.NameResolver;
 import compiler.semantic.check.LoopChecker;
@@ -26,7 +27,8 @@ public final class SemanticAnalyzer {
                     new TypeChecker(), 
                     new SignatureChecker(), 
                     new ContextChecker(),
-                    new LoopChecker()
+                    new LoopChecker(),
+                    new ArrayBoundsChecker()
                 );
     }
 }
