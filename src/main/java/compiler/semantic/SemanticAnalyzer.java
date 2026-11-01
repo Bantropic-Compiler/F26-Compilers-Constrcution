@@ -4,6 +4,7 @@ import compiler.ast.Program;
 import compiler.semantic.check.Check;
 import compiler.semantic.check.ContextChecker;
 import compiler.semantic.check.NameResolver;
+import compiler.semantic.check.LoopChecker;
 import compiler.semantic.check.SignatureChecker;
 import compiler.semantic.check.TypeChecker;
 import java.util.List;
@@ -20,6 +21,12 @@ public final class SemanticAnalyzer {
     }
 
     private static List<Check> checks() {
-        return List.of(new NameResolver(), new TypeChecker(), new SignatureChecker(), new ContextChecker());
+        return List.of(
+                    new NameResolver(), 
+                    new TypeChecker(), 
+                    new SignatureChecker(), 
+                    new ContextChecker(),
+                    new LoopChecker()
+                );
     }
 }
