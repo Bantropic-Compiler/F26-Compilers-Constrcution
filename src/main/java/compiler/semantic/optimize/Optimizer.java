@@ -18,7 +18,7 @@ public final class Optimizer {
     }
 
     private static List<Optimization> optimizations() {
-        return List.of();
+        return List.of(new ConstantFolding());
     }
 
     /**
