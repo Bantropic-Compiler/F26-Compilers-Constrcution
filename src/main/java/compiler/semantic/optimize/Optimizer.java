@@ -18,7 +18,12 @@ public final class Optimizer {
     }
 
     private static List<Optimization> optimizations() {
-        return List.of(new ConstantPropagation(), new ConstantFolding(), new AlgebraicSimplification());
+        return List.of(
+            new ConstantPropagation(), 
+            new ConstantFolding(), 
+            new AlgebraicSimplification(),
+            new ControlFlowSimplification()
+        );
     }
 
     /**
