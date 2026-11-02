@@ -6,10 +6,76 @@ import compiler.ast.expression.expression.UnaryExpression;
 import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.ast.expression.literal.RealLiteral;
 import compiler.semantic.type.PrimitiveType;
+import compiler.semantic.type.SemanticType;
+import compiler.semantic.type.StringType;
+import compiler.ast.expression.literal.*;
 
 public final class ConstantEvaluator {
 
     private ConstantEvaluator() {
+    }
+
+    /** A typed constant; null from valueOf means evaluation is unsafe or impossible. */
+    public record Constant(SemanticType type, Object value) {}
+
+    public static Constant valueOf(Expression expression, SemanticModel model) {
+        SemanticType type = model.typeOf(expression);
+        if (type.isError()) return null;
+        if (type.isNumeric()) {
+            Double value = numericValue(expression, model);
+            if (value == null) return null;
+            if (type == PrimitiveType.INTEGER) return new Constant(type, value.longValue());
+            return new Constant(type, value);
+        }
+        if (expression instanceof BooleanLiteral n) return new Constant(type, n.value);
+        if (expression instanceof CharLiteral n) return new Constant(type, n.codePoint);
+        if (expression instanceof StringLiteral n) return new Constant(type, n.value);
+        if (expression instanceof UnaryExpression n) {
+            Constant operand = valueOf(n.operand, model);
+            return operand != null && n.op == compiler.lexer.TokenType.NOT
+                    ? new Constant(type, !booleanValue(operand)) : null;
+        }
+        if (!(expression instanceof BinaryExpression n)) return null;
+        Constant left = valueOf(n.left, model);
+        Constant right = valueOf(n.right, model);
+        if (left == null || right == null) return null;
+        if (type == StringType.INSTANCE) {
+            return new Constant(type, textValue(left) + textValue(right));
+        }
+        Object result;
+        switch (n.op) {
+            case AND -> result = booleanValue(left) & booleanValue(right);
+            case OR -> result = booleanValue(left) | booleanValue(right);
+            case XOR -> result = booleanValue(left) ^ booleanValue(right);
+            case EQ, NEQ -> {
+                boolean equal = left.type().isNumeric() && right.type().isNumeric()
+                        ? ((Number) left.value()).doubleValue() == ((Number) right.value()).doubleValue()
+                        : left.value().equals(right.value());
+                result = n.op == compiler.lexer.TokenType.EQ ? equal : !equal;
+            }
+            case LT, LE, GT, GE -> {
+                double l = ((Number) left.value()).doubleValue();
+                double r = ((Number) right.value()).doubleValue();
+                result = switch (n.op) {
+                    case LT -> l < r;
+                    case LE -> l <= r;
+                    case GT -> l > r;
+                    default -> l >= r;
+                };
+            }
+            default -> { return null; }
+        }
+        return new Constant(type, result);
+    }
+
+    private static boolean booleanValue(Constant value) {
+        return value.type() == PrimitiveType.BOOLEAN
+                ? (Boolean) value.value() : ((Number) value.value()).longValue() == 1;
+    }
+
+    private static String textValue(Constant value) {
+        return value.type() == PrimitiveType.CHAR
+                ? new String(Character.toChars((Integer) value.value())) : (String) value.value();
     }
 
     /** Value of a constant integer expression built from literals, or null if it is not one. */
@@ -36,6 +102,9 @@ public final class ConstantEvaluator {
         } else if (expression instanceof RealLiteral literal) {
             value = literal.value;
         } else if (expression instanceof UnaryExpression unary) {
+            if (unary.op == compiler.lexer.TokenType.MINUS
+                    && unary.operand instanceof IntegerLiteral literal
+                    && literal.value == 2147483648L) return (double) Integer.MIN_VALUE;
             Double operand = numericValue(unary.operand, model);
             if (operand == null) {
                 return null;
@@ -79,7 +148,10 @@ public final class ConstantEvaluator {
             return literal.value;
         }
         if (expression instanceof UnaryExpression unary) {
-            Long operand = evaluate(unary.operand);
+            if (unary.op == compiler.lexer.TokenType.MINUS
+                    && unary.operand instanceof IntegerLiteral literal
+                    && literal.value == 2147483648L) return (long) Integer.MIN_VALUE;
+            Long operand = integerValue(unary.operand);
             if (operand == null) {
                 return null;
             }
@@ -90,8 +162,8 @@ public final class ConstantEvaluator {
             };
         }
         if (expression instanceof BinaryExpression binary) {
-            Long left = evaluate(binary.left);
-            Long right = evaluate(binary.right);
+            Long left = integerValue(binary.left);
+            Long right = integerValue(binary.right);
             if (left == null || right == null) {
                 return null;
             }

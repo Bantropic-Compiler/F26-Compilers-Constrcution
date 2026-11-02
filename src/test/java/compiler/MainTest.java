@@ -35,6 +35,44 @@ class MainTest {
         assertTrue(diagnostics.contains("2:"));
     }
 
+    @Test
+    void runsPipelineWithAllFlagCombinations() throws Exception {
+        Path source = Path.of("src/test/resources/semantic/optimize/unused-variable/combined.i");
+        var original = compiler.semantic.SemanticTestSupport.parse(Files.readString(source));
+        var expected = compiler.semantic.SemanticTestSupport.parse(Files.readString(
+                source.resolveSibling("combined.expected.i")));
+        for (boolean noOpt : new boolean[]{false, true}) {
+            for (boolean ast : new boolean[]{false, true}) {
+                List<String> flags = new ArrayList<>();
+                if (noOpt) flags.add("--no-opt");
+                if (ast) flags.add("--ast");
+                Result result = launch(source, flags.toArray(String[]::new));
+                var tree = noOpt ? original : expected;
+                assertEquals(0, result.status());
+                assertEquals("", result.errors());
+                assertEquals(ast ? tree.describe() : compiler.semantic.visitor.SourcePrinter.print(tree), result.output());
+            }
+        }
+    }
+
+    @Test
+    void reportsOptimizationFailureWithoutPrintingPartialResult() throws Exception {
+        Path source = Path.of("src/test/resources/semantic/optimize/constant-propagation/division-by-zero.i");
+        Result result = launch(source);
+        assertEquals(1, result.status());
+        assertEquals("", result.output());
+        assertTrue(result.errors().contains("ConstantPropagation"));
+        assertEquals(0, launch(source, "--no-opt").status());
+    }
+
+    @Test
+    void rejectsUnknownFlag() throws Exception {
+        Result result = launch(Path.of("prog-examples/01-print-number.i"), "--unknown");
+        assertEquals(2, result.status());
+        assertEquals("", result.output());
+        assertTrue(result.errors().contains("usage:"));
+    }
+
     private static Result launch(Path source, String... flags) throws Exception {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         String classes = Path.of("target/classes").toAbsolutePath().toString();
