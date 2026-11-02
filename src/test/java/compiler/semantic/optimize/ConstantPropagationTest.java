@@ -33,8 +33,8 @@ class ConstantPropagationTest {
 
     @Test void propagatesAcrossRoundsAndFolds() {
         String result = optimize(fixture("across-rounds.i"));
-        assertTrue(result.contains("var a is 3"));
-        assertTrue(result.contains("var b is 6"));
+        assertFalse(result.contains("var a"));
+        assertFalse(result.contains("var b"));
         assertTrue(result.contains("print 6"));
     }
 

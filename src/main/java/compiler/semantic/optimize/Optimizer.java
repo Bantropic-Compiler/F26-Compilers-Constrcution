@@ -23,7 +23,8 @@ public final class Optimizer {
             new ConstantFolding(), 
             new AlgebraicSimplification(),
             new ControlFlowSimplification(),
-            new UnreachableCodeElimination()
+            new UnreachableCodeElimination(),
+            new UnusedVariableElimination()
         );
     }
 
