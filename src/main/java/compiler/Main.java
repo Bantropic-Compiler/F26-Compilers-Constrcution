@@ -9,11 +9,20 @@ import compiler.semantic.Diagnostic;
 import compiler.semantic.SemanticAnalyzer;
 import compiler.semantic.SemanticResult;
 import compiler.semantic.visitor.SourcePrinter;
+import compiler.semantic.optimize.Optimizer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Reads an I source file and prints its AST, or syntax errors, to the console. */
+/** Parses, checks and optimizes I source; prints source or AST (no code generation yet).
+ * Run from the repository root:
+ * mvn compile
+ * java -cp target/classes compiler.Main prog-examples/01-print-number.i
+ * java -cp target/classes compiler.Main --no-opt prog-examples/01-print-number.i
+ * java -cp target/classes compiler.Main --ast prog-examples/01-print-number.i
+ * java -cp target/classes compiler.Main --no-opt --ast prog-examples/01-print-number.i
+ * Exit codes: 0 success, 1 compilation/read error, 2 invalid arguments.
+ */
 public class Main {
 
     public static void main(String[] args) {
@@ -60,7 +69,17 @@ public class Main {
             }
 
             if (optimize) {
-                program = optimize(program);
+                var result = new Optimizer().optimize(program, analysis);
+                program = result.program();
+                analysis = result.semanticResult();
+                if (result.hasErrors()) {
+                    System.err.println("Optimization failed in " + result.failedPass());
+                    for (Diagnostic diagnostic : analysis.diagnostics()) {
+                        System.err.println(diagnostic);
+                    }
+                    System.exit(1);
+                    return;
+                }
             }
 
             System.out.print(printAst ? program.describe() : SourcePrinter.print(program));
@@ -68,10 +87,6 @@ public class Main {
             System.err.println(error.getMessage());
             System.exit(1);
         }
-    }
-
-    private static Program optimize(Program program) {
-        return program;
     }
 
     private static void usage() {

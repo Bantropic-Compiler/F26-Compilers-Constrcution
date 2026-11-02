@@ -42,7 +42,7 @@ class MainSemanticTest {
         Result result = launch(write("var x is 1+2\n"));
 
         assertEquals(0, result.status());
-        assertEquals("var x is 1 + 2\n", result.output());
+        assertEquals("var x is 3\n", result.output());
         assertEquals("", result.errors());
     }
 
