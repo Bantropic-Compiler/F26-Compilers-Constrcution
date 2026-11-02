@@ -22,7 +22,8 @@ public final class Optimizer {
             new ConstantPropagation(), 
             new ConstantFolding(), 
             new AlgebraicSimplification(),
-            new ControlFlowSimplification()
+            new ControlFlowSimplification(),
+            new UnreachableCodeElimination()
         );
     }
 
