@@ -5,6 +5,21 @@ import compiler.ast.declaration.Declaration;
 import compiler.ast.declaration.Parameter;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.declaration.VariableDeclaration;
+import compiler.ast.expression.Accessor;
+import compiler.ast.expression.Expression;
+import compiler.ast.expression.ModifiablePrimaryNode;
+import compiler.ast.expression.accessor.FieldAccess;
+import compiler.ast.expression.accessor.IndexAccess;
+import compiler.ast.expression.expression.BinaryExpression;
+import compiler.ast.expression.expression.RoutineCallExpression;
+import compiler.ast.expression.expression.UnaryExpression;
+import compiler.ast.expression.literal.BooleanLiteral;
+import compiler.ast.expression.literal.CharLiteral;
+import compiler.ast.expression.literal.IntegerLiteral;
+import compiler.ast.expression.literal.RealLiteral;
+import compiler.ast.expression.literal.StringLiteral;
+import compiler.lexer.TokenType;
+import compiler.semantic.symbol.VariableSymbol;
 import compiler.semantic.SemanticModel;
 import compiler.semantic.symbol.RoutineSymbol;
 import compiler.semantic.type.ArrayType;
@@ -66,9 +81,13 @@ public final class CodeGenerator {
         for (Declaration declaration : program.declarations) {
             if (declaration instanceof VariableDeclaration variable) {
                 SemanticType type = globalType(variable);
-                emitDefault(code, type);
-
-                // Program.global = default value (pops the value)
+                if (variable.initializer == null) {
+                    emitDefault(code, type);
+                } else {
+                    emitExpression(code, variable.initializer);
+                    emitConversion(model.typeOf(variable.initializer), type, code);
+                }
+                // store the initializer or default value in the global field
                 code.emit("putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(variable.name)
                         + " " + jvm.descriptor(type));
             }
@@ -175,6 +194,244 @@ public final class CodeGenerator {
         code.emit("goto " + start); // jump back to the loop start
         code.place(end);
     }
+
+    void emitExpression(Code code, Expression expression) {
+        if (expression instanceof IntegerLiteral n) {
+            // push the 32-bit integer literal
+            code.emit("ldc " + (int) n.value);
+        } else if (expression instanceof RealLiteral n) {
+            // push the double literal
+            code.emit("ldc2_w " + n.value);
+        } else if (expression instanceof BooleanLiteral b) {
+            // push 1 for true or 0 for false
+            code.emit(b.value ? "iconst_1" : "iconst_0");
+        } else if (expression instanceof CharLiteral c) {
+            // push the Unicode code point as an integer
+            code.emit("ldc " + c.codePoint);
+        } else if (expression instanceof StringLiteral s) {
+            // push the string literal
+            code.emit("ldc " + jvm.quote(s.value));
+        } else if (expression instanceof ModifiablePrimaryNode variable) {
+            emitRead(code, variable);
+        } else if (expression instanceof UnaryExpression unary) {
+            emitUnary(code, unary);
+        } else if (expression instanceof BinaryExpression binary) {
+            emitBinary(code, binary);
+        } else if (expression instanceof RoutineCallExpression call) {
+            emitCall(code, call);
+        } else {
+            throw new UnsupportedOperationException("Unsupported expression: " + expression.getClass().getSimpleName());
+        }
+    }
+
+    private void emitRead(Code code, ModifiablePrimaryNode variable) {
+        VariableSymbol symbol = model.variableOf(variable);
+        SemanticType type = symbol.type();
+        if (symbol.kind() == VariableSymbol.Kind.GLOBAL) {
+            // load the global variable from its static field
+            code.emit("getstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(symbol.name())
+                    + " " + jvm.descriptor(type));
+        } else {
+            // load the local variable or parameter from its slot
+            code.emit(jvm.prefix(type) + "load " + code.slotOf(symbol));
+        }
+        for (Accessor accessor : variable.accessors) {
+            if (accessor instanceof IndexAccess index) {
+                emitExpression(code, index.index);
+                // push the offset between source and JVM indices
+                code.emit("iconst_1");
+                // subtract one to obtain the zero-based JVM index
+                code.emit("isub");
+                if (type instanceof ArrayType array) {
+                    type = array.elementType();
+                    // load the array element using the opcode for its type
+                    code.emit(jvm.prefix(type) + "aload");
+                } else {
+                    // load the UTF-16 code unit at the given index
+                    code.emit("invokevirtual java/lang/String/charAt(I)C");
+                    type = PrimitiveType.CHAR;
+                }
+            } else if (accessor instanceof FieldAccess field) {
+                if (type instanceof RecordType record) {
+                    type = record.fieldType(field.name);
+                    // read the field from the record on the stack
+                    code.emit("getfield " + jvm.recordClass(record) + "/" + jvm.fieldName(field.name)
+                            + " " + jvm.descriptor(type));
+                } else {
+                    // get the array length or the number of UTF-16 code units in the string
+                    code.emit(type instanceof ArrayType ? "arraylength" : "invokevirtual java/lang/String/length()I");
+                    type = PrimitiveType.INTEGER;
+                }
+            }
+        }
+    }
+
+    private void emitUnary(Code code, UnaryExpression unary) {
+        emitExpression(code, unary.operand);
+        switch (unary.op) {
+            case PLUS -> { /* Unary plus leaves the operand unchanged. */ }
+            case MINUS -> {
+                // negate the integer or double operand
+                code.emit(jvm.prefix(model.typeOf(unary.operand)) + "neg");
+            }
+            case NOT -> emitNot(code);
+            default -> throw new IllegalArgumentException("not a unary operator: " + unary.op);
+        }
+    }
+
+    private void emitNot(Code code) {
+        // push the bit used to invert a normalized boolean
+        code.emit("iconst_1");
+        // flip 0 to 1 and 1 to 0
+        code.emit("ixor");
+    }
+
+    private void emitBinary(Code code, BinaryExpression binary) {
+        if (model.typeOf(binary) == StringType.INSTANCE) {
+            emitConcatenation(code, binary);
+            return;
+        }
+        boolean real = model.typeOf(binary.left) == PrimitiveType.REAL
+                || model.typeOf(binary.right) == PrimitiveType.REAL;
+        emitOperand(code, binary.left, real);
+        emitOperand(code, binary.right, real);
+        switch (binary.op) {
+            case PLUS, MINUS, STAR, SLASH, PERCENT -> {
+                String operation = switch (binary.op) {
+                    case PLUS -> "add";
+                    case MINUS -> "sub";
+                    case STAR -> "mul";
+                    case SLASH -> "div";
+                    default -> "rem";
+                };
+                // consume both numeric operands and push the arithmetic result
+                code.emit((real ? "d" : "i") + operation);
+            }
+            case AND, OR, XOR -> {
+                String operation = switch (binary.op) {
+                    case AND -> "iand";
+                    case OR -> "ior";
+                    default -> "ixor";
+                };
+                // combine both evaluated boolean operands without short-circuiting
+                code.emit(operation);
+            }
+            case EQ, NEQ, LT, LE, GT, GE -> {
+                if (model.typeOf(binary.left) == StringType.INSTANCE) {
+                    // Semantic analyzer already check 
+                    // that string type allows only = and /= binary expressions
+
+                    // compare string contents and push a normalized boolean
+                    code.emit("invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z");
+                    if (binary.op == TokenType.NEQ) {
+                        emitNot(code);
+                    }
+                } else {
+                    emitComparison(code, binary.op, real);
+                }
+            }
+            default -> throw new IllegalArgumentException("not a binary operator: " + binary.op);
+        }
+    }
+
+    private void emitOperand(Code code, Expression operand, boolean real) {
+        emitExpression(code, operand);
+        if (real) {
+            // widen this operand before evaluating the next one, preserving stack order
+            emitConversion(model.typeOf(operand), PrimitiveType.REAL, code);
+        }
+    }
+
+    /**
+     * Converts the value on top of the stack; semantic analysis must have approved the conversion.
+     * Boolean/integer conversions and compatible reference types need no JVM instructions.
+     * In particular, integer-to-boolean is already restricted to constants 0 and 1.
+     */
+    private void emitConversion(SemanticType sourceType, SemanticType targetType, Code code) {
+        if (targetType == PrimitiveType.REAL
+                && (sourceType == PrimitiveType.INTEGER || sourceType == PrimitiveType.BOOLEAN)) {
+            code.emit("i2d");
+        } else if (targetType == PrimitiveType.INTEGER && sourceType == PrimitiveType.REAL) {
+            // round to the nearest integer, choosing the even integer for ties
+            code.emit("invokestatic java/lang/Math/rint(D)D");
+            code.emit("d2i");
+        }
+    }
+
+    private void emitComparison(Code code, TokenType operator, boolean real) {
+        String condition = switch (operator) {
+            case EQ -> "eq";
+            case NEQ -> "ne";
+            case LT -> "lt";
+            case LE -> "le";
+            case GT -> "gt";
+            case GE -> "ge";
+            default -> throw new IllegalArgumentException("not a comparison: " + operator);
+        };
+        // Оба операнда уже вычислены: стек [..., левый, правый], правый на вершине.
+        // Нужно заменить их одним boolean: 0 или 1.
+        if (real) {
+            // JVM не умеет одним условным переходом сравнивать два double.
+            // dcmpg/dcmpl снимают оба числа и кладут int: 
+            // -1, если левое < правого,
+            // 0, если равны, 
+            // 1, если левое > правого. 
+            // Стек станет [..., результат].
+            // Разница только при NaN в любом операнде: dcmpg даёт 1, dcmpl даёт -1.
+            // Для < и <= выбираем 1: последующая проверка результата < 0 или <= 0 ложна.
+            // Для > и >= выбираем -1: проверка > 0 или >= 0 тоже ложна.
+            // Поэтому сравнения порядка с NaN всегда ложны. Для = и /= подходят оба
+            // варианта: ненулевой результат означает, что равенство ложно, а неравенство истинно.
+            code.emit(operator == TokenType.LT || operator == TokenType.LE ? "dcmpg" : "dcmpl");
+        }
+        // Это имена меток в генерируемом коде.
+        // yes — ветка истины; end — общая точка продолжения с готовым boolean на стеке.
+        String yes = code.newLabel();
+        String end = code.newLabel();
+        // Для integer if_icmplt снимает два числа и переходит к yes, если левое < правого.
+        // Для real инструкция iflt снимает один int от dcmpg/dcmpl и переходит, если он < 0.
+        // Остальные condition аналогично задают =, /=, <=, > или >=.
+        // Сам переход НЕ кладёт boolean на стек: после проверки остаётся [...].
+        code.emit((real ? "if" : "if_icmp") + condition + " " + yes);
+        // Если условие ложно, перехода нет: выполняем следующую инструкцию и кладём 0.
+        code.emit("iconst_0");
+        // Пропускаем ветку истины. 
+        code.emit("goto " + end);
+        // Сюда условный переход приводит только при истинном сравнении.
+        code.place(yes);
+        // Кладём 1 вместо пропущенного iconst_0.
+        code.emit("iconst_1");
+        // Обе ветки сходятся со стеком [..., boolean]: добавлено ровно одно значение, 0 или 1.
+        code.place(end);
+    }
+
+    private void emitConcatenation(Code code, BinaryExpression binary) {
+        emitStringOperand(code, binary.left);
+        emitStringOperand(code, binary.right);
+        // concatenate the right string onto the left string
+        code.emit("invokevirtual java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;");
+    }
+
+    private void emitStringOperand(Code code, Expression operand) {
+        emitExpression(code, operand);
+        if (model.typeOf(operand) == PrimitiveType.CHAR) {
+            // convert the entire Unicode code point to a string
+            code.emit("invokestatic java/lang/Character/toString(I)Ljava/lang/String;");
+        }
+    }
+
+    private void emitCall(Code code, RoutineCallExpression call) {
+        RoutineSymbol routine = model.routineOf(call);
+        for (int i = 0; i < call.args.size(); i++) {
+            Expression argument = call.args.get(i);
+            emitExpression(code, argument);
+            // Convert while this argument is on top, before evaluating the next one.
+            emitConversion(model.typeOf(argument), routine.parameterTypes().get(i), code);
+        }
+        code.emit("invokestatic " + Jvm.PROGRAM_CLASS + "/" + jvm.methodName(routine.name())
+                + jvm.methodDescriptor(routine.parameterTypes(), routine.returnType()));
+    }
+
 
     private SemanticType globalType(VariableDeclaration variable) {
         return model.variableOf(variable).type();
