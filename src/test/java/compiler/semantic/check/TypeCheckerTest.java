@@ -271,6 +271,26 @@ class TypeCheckerTest {
     }
 
     @Test
+    void printRejectsArraysAndRecords() {
+        assertEquals(List.of("3:14: cannot print 'array[3] integer'"), body(
+                "var a: array[3] integer",
+                "print 1, a"));
+        assertEquals(List.of("4:14: cannot print 'R'"), body(
+                "type R is record var x: integer end",
+                "var r: R",
+                "print 1, r"));
+    }
+
+    @Test
+    void printAcceptsArrayElementsAndRecordFields() {
+        assertEquals(List.of(), body(
+                "type R is record var x: integer end",
+                "var a: array[3] integer",
+                "var r: R",
+                "print a[1], r.x"));
+    }
+
+    @Test
     void errorsDoNotCascade() {
         assertEquals(List.of("2:14: 'x' is not declared"), body("var a is x + 1 * 2"));
         assertEquals(List.of("2:5: 'x' is not declared", "2:10: operator '+' cannot be applied to 'integer' and 'boolean'"), body("x := 1 + true"));

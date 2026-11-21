@@ -124,7 +124,10 @@ public final class TypeChecker extends AstVisitor implements Check {
     @Override
     protected void visitPrint(PrintStatement node) {
         for (Expression argument : node.args) {
-            typeOf(argument);
+            SemanticType type = typeOf(argument);
+            if (type instanceof ArrayType || type instanceof RecordType) {
+                diagnostics.report(argument, "cannot print '" + type + "'");
+            }
         }
     }
 
