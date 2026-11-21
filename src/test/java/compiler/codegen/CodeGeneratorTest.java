@@ -282,6 +282,71 @@ class CodeGeneratorTest {
                 """));
     }
 
+    @ParameterizedTest
+    @CsvSource({"false, 0, 1, 1", "true, 1, 0, -1"})
+    void rangeForEvaluatesBoundsOnceAndChecksEndpointBeforeStepping(
+            boolean reverse, int lower, int upper, int step) {
+        String text = program("""
+                routine lo(): integer => 1
+                routine hi(): integer => 3
+                routine f() is
+                    for i in lo()..hi() %s loop
+                        var seen is i
+                        continue
+                    end
+                end
+                """.formatted(reverse ? "reverse" : ""));
+        assertEquals(1, count(text, "invokestatic Program/r_lo()I"));
+        assertEquals(1, count(text, "invokestatic Program/r_hi()I"));
+        assertTrue(text.contains("""
+                    invokestatic Program/r_lo()I
+                    istore %d
+                    invokestatic Program/r_hi()I
+                    istore %d
+                    iload %d
+                    iload %d
+                    if_icmpgt L3
+                L1:
+                    iload 0
+                    istore 2
+                    goto L2
+                L2:
+                    iload 0
+                    iload 1
+                    if_icmpeq L3
+                    iinc 0 %d
+                    goto L1
+                L3:
+                    return
+                """.formatted(lower, upper, lower, upper, step)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, integer, i", "true, real, d", "false, string, a"})
+    void arrayForCapturesSourceAndLoadsElementsAtEachIndex(
+            boolean reverse, String type, String prefix) {
+        String text = program("""
+                var values: array[3] %1$s
+                routine source(): array[3] %1$s => values
+                routine f() is
+                    for item in source() %2$s loop
+                        var seen is item
+                        continue
+                    end
+                end
+                """.formatted(type, reverse ? "reverse" : ""));
+        assertEquals(1, count(text, "invokestatic Program/r_source()"));
+        String initialIndex = reverse
+                ? "    aload 0\n    arraylength\n    iconst_1\n    isub\n"
+                : "    iconst_0\n";
+        String check = reverse ? "    iflt L3\n" : "    aload 0\n    arraylength\n    if_icmpge L3\n";
+        assertTrue(text.contains("    astore 0\n" + initialIndex + "    istore 1\nL1:\n    iload 1\n" + check
+                + "    aload 0\n    iload 1\n    " + prefix + "aload\n    " + prefix + "store 2\n"
+                + "    " + prefix + "load 2\n"));
+        assertTrue(text.contains("    goto L2\nL2:\n    iinc 1 " + (reverse ? -1 : 1)
+                + "\n    goto L1\nL3:\n    return\n"));
+    }
+
     @Test
     void evaluatesNestedAssignmentTargetOnceBeforeValue() {
         String text = program("""

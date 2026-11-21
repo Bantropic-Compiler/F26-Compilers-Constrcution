@@ -24,6 +24,7 @@ import compiler.ast.statement.AssignmentStatement;
 import compiler.ast.statement.IfStatement;
 import compiler.ast.statement.loop.BreakStatement;
 import compiler.ast.statement.loop.ContinueStatement;
+import compiler.ast.statement.loop.ForStatement;
 import compiler.ast.statement.loop.WhileStatement;
 import compiler.ast.statement.routine.ReturnStatement;
 import compiler.lexer.TokenType;
@@ -465,7 +466,7 @@ public final class CodeGenerator {
                 + jvm.methodDescriptor(routine.parameterTypes(), routine.returnType()));
     }
 
-    private record LoopLabels(String check, String exit) {}
+    private record LoopLabels(String continueTarget, String exit) {}
 
     /** Returns true when no path falls through to the next statement. */
     private boolean emitBlock(Code code, BlockNode block, SemanticType returnType, LoopLabels loop) {
@@ -483,11 +484,17 @@ public final class CodeGenerator {
                 }
             } else if (item instanceof WhileStatement statement) {
                 emitWhile(code, statement, returnType);
+            } else if (item instanceof ForStatement statement) {
+                if (statement.rangeEnd == null) {
+                    emitArrayFor(code, statement, returnType);
+                } else {
+                    emitRangeFor(code, statement, returnType);
+                }
             } else if (item instanceof BreakStatement) {
                 code.emit("goto " + loop.exit());
                 return true;
             } else if (item instanceof ContinueStatement) {
-                code.emit("goto " + loop.check());
+                code.emit("goto " + loop.continueTarget());
                 return true;
             } else if (item instanceof ReturnStatement statement) {
                 if (statement.value != null) {
@@ -524,12 +531,81 @@ public final class CodeGenerator {
 
     private void emitWhile(Code code, WhileStatement statement, SemanticType returnType) {
         LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
-        code.place(loop.check());
+        code.place(loop.continueTarget());
         emitExpression(code, statement.condition);
         code.emit("ifeq " + loop.exit());
         if (!emitBlock(code, statement.body, returnType, loop)) {
-            code.emit("goto " + loop.check());
+            code.emit("goto " + loop.continueTarget());
         }
+        code.place(loop.exit());
+    }
+
+    private void emitRangeFor(Code code, ForStatement statement, SemanticType returnType) {
+        int current = code.declare(model.variableOf(statement));
+        int last = code.newLocal(1);
+        int lower = statement.reverse ? last : current;
+        int upper = statement.reverse ? current : last;
+        emitExpression(code, statement.rangeStart);
+        code.emit("istore " + lower);
+        emitExpression(code, statement.rangeEnd);
+        code.emit("istore " + upper);
+
+        String body = code.newLabel();
+        LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
+        code.emit("iload " + lower);
+        code.emit("iload " + upper);
+        code.emit("if_icmpgt " + loop.exit());
+        code.place(body);
+        emitBlock(code, statement.body, returnType, loop);
+        code.place(loop.continueTarget());
+        // The inclusive endpoint must exit before iinc can wrap around.
+        code.emit("iload " + current);
+        code.emit("iload " + last);
+        code.emit("if_icmpeq " + loop.exit());
+        code.emit("iinc " + current + (statement.reverse ? " -1" : " 1"));
+        code.emit("goto " + body);
+        code.place(loop.exit());
+    }
+
+    private void emitArrayFor(Code code, ForStatement statement, SemanticType returnType) {
+        int array = code.newLocal(1);
+        int index = code.newLocal(1);
+        VariableSymbol element = model.variableOf(statement);
+        int value = code.declare(element);
+        emitExpression(code, statement.rangeStart);
+        code.emit("astore " + array);
+        if (statement.reverse) {
+            // (Length - 1) for reverse
+            code.emit("aload " + array);
+            code.emit("arraylength");
+            code.emit("iconst_1");
+            code.emit("isub");
+        } else {
+            // 0 is starting point for array traversing
+            code.emit("iconst_0");
+        }
+        code.emit("istore " + index);
+
+        String check = code.newLabel();
+        LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
+        code.place(check);
+        code.emit("iload " + index);
+        if (statement.reverse) {
+            code.emit("iflt " + loop.exit());
+        } else {
+            code.emit("aload " + array);
+            code.emit("arraylength");
+            code.emit("if_icmpge " + loop.exit());
+        }
+        code.emit("aload " + array);
+        code.emit("iload " + index);
+        String prefix = jvm.prefix(element.type());
+        code.emit(prefix + "aload");
+        code.emit(prefix + "store " + value);
+        emitBlock(code, statement.body, returnType, loop);
+        code.place(loop.continueTarget());
+        code.emit("iinc " + index + (statement.reverse ? " -1" : " 1"));
+        code.emit("goto " + check);
         code.place(loop.exit());
     }
 
