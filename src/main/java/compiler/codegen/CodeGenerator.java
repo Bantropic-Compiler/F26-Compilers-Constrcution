@@ -406,26 +406,17 @@ public final class CodeGenerator {
     }
 
     private void emitConcatenation(Code code, BinaryExpression binary) {
-        // allocate a builder for the concatenation result
-        code.emit("new java/lang/StringBuilder");
-        // retain the builder reference after its constructor consumes one copy
-        code.emit("dup");
-        // initialize the empty builder
-        code.emit("invokespecial java/lang/StringBuilder/<init>()V");
-        emitAppend(code, binary.left);
-        emitAppend(code, binary.right);
-        // turn the accumulated contents into an immutable string
-        code.emit("invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;");
+        emitStringOperand(code, binary.left);
+        emitStringOperand(code, binary.right);
+        // concatenate the right string onto the left string
+        code.emit("invokevirtual java/lang/String/concat(Ljava/lang/String;)Ljava/lang/String;");
     }
 
-    private void emitAppend(Code code, Expression operand) {
+    private void emitStringOperand(Code code, Expression operand) {
         emitExpression(code, operand);
         if (model.typeOf(operand) == PrimitiveType.CHAR) {
-            // append the entire Unicode code point, including supplementary characters
-            code.emit("invokevirtual java/lang/StringBuilder/appendCodePoint(I)Ljava/lang/StringBuilder;");
-        } else {
-            // append the string and leave the builder available for the next operand
-            code.emit("invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
+            // convert the entire Unicode code point to a string
+            code.emit("invokestatic java/lang/Character/toString(I)Ljava/lang/String;");
         }
     }
 
