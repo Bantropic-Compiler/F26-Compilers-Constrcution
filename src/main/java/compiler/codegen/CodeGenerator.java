@@ -10,11 +10,14 @@ import compiler.ast.expression.Expression;
 import compiler.ast.expression.ModifiablePrimaryNode;
 import compiler.ast.expression.accessor.FieldAccess;
 import compiler.ast.expression.accessor.IndexAccess;
+import compiler.ast.expression.expression.BinaryExpression;
+import compiler.ast.expression.expression.UnaryExpression;
 import compiler.ast.expression.literal.BooleanLiteral;
 import compiler.ast.expression.literal.CharLiteral;
 import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.ast.expression.literal.RealLiteral;
 import compiler.ast.expression.literal.StringLiteral;
+import compiler.lexer.TokenType;
 import compiler.semantic.symbol.VariableSymbol;
 import compiler.semantic.SemanticModel;
 import compiler.semantic.symbol.RoutineSymbol;
@@ -218,6 +221,10 @@ public final class CodeGenerator {
             code.emit("ldc " + jvm.quote(s.value));
         } else if (expression instanceof ModifiablePrimaryNode variable) {
             emitRead(code, variable);
+        } else if (expression instanceof UnaryExpression unary) {
+            emitUnary(code, unary);
+        } else if (expression instanceof BinaryExpression binary) {
+            emitBinary(code, binary);
         } else {
             throw new UnsupportedOperationException("Unsupported expression: " + expression.getClass().getSimpleName());
         }
@@ -262,6 +269,153 @@ public final class CodeGenerator {
                     type = PrimitiveType.INTEGER;
                 }
             }
+        }
+    }
+
+    private void emitUnary(Code code, UnaryExpression unary) {
+        emitExpression(code, unary.operand);
+        switch (unary.op) {
+            case PLUS -> { /* Unary plus leaves the operand unchanged. */ }
+            case MINUS -> {
+                // negate the integer or double operand
+                code.emit(jvm.prefix(model.typeOf(unary.operand)) + "neg");
+            }
+            case NOT -> emitNot(code);
+            default -> throw new IllegalArgumentException("not a unary operator: " + unary.op);
+        }
+    }
+
+    private void emitNot(Code code) {
+        // push the bit used to invert a normalized boolean
+        code.emit("iconst_1");
+        // flip 0 to 1 and 1 to 0
+        code.emit("ixor");
+    }
+
+    private void emitBinary(Code code, BinaryExpression binary) {
+        if (model.typeOf(binary) == StringType.INSTANCE) {
+            emitConcatenation(code, binary);
+            return;
+        }
+        boolean real = model.typeOf(binary.left) == PrimitiveType.REAL
+                || model.typeOf(binary.right) == PrimitiveType.REAL;
+        emitOperand(code, binary.left, real);
+        emitOperand(code, binary.right, real);
+        switch (binary.op) {
+            case PLUS, MINUS, STAR, SLASH, PERCENT -> {
+                String operation = switch (binary.op) {
+                    case PLUS -> "add";
+                    case MINUS -> "sub";
+                    case STAR -> "mul";
+                    case SLASH -> "div";
+                    default -> "rem";
+                };
+                // consume both numeric operands and push the arithmetic result
+                code.emit((real ? "d" : "i") + operation);
+            }
+            case AND, OR, XOR -> {
+                String operation = switch (binary.op) {
+                    case AND -> "iand";
+                    case OR -> "ior";
+                    default -> "ixor";
+                };
+                // combine both evaluated boolean operands without short-circuiting
+                code.emit(operation);
+            }
+            case EQ, NEQ, LT, LE, GT, GE -> {
+                if (model.typeOf(binary.left) == StringType.INSTANCE) {
+                    // Semantic analyzer already check 
+                    // that string type allows only = and /= binary expressions
+
+                    // compare string contents and push a normalized boolean
+                    code.emit("invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z");
+                    if (binary.op == TokenType.NEQ) {
+                        emitNot(code);
+                    }
+                } else {
+                    emitComparison(code, binary.op, real);
+                }
+            }
+            default -> throw new IllegalArgumentException("not a binary operator: " + binary.op);
+        }
+    }
+
+    private void emitOperand(Code code, Expression operand, boolean real) {
+        emitExpression(code, operand);
+        if (real && model.typeOf(operand) == PrimitiveType.INTEGER) {
+            // widen this operand before evaluating the next one, preserving stack order
+            code.emit("i2d");
+        }
+    }
+
+    private void emitComparison(Code code, TokenType operator, boolean real) {
+        String condition = switch (operator) {
+            case EQ -> "eq";
+            case NEQ -> "ne";
+            case LT -> "lt";
+            case LE -> "le";
+            case GT -> "gt";
+            case GE -> "ge";
+            default -> throw new IllegalArgumentException("not a comparison: " + operator);
+        };
+        // Оба операнда уже вычислены: стек [..., левый, правый], правый на вершине.
+        // Нужно заменить их одним boolean: 0 или 1.
+        if (real) {
+            // JVM не умеет одним условным переходом сравнивать два double.
+            // dcmpg/dcmpl снимают оба числа и кладут int: 
+            // -1, если левое < правого,
+            // 0, если равны, 
+            // 1, если левое > правого. 
+            // Стек станет [..., результат].
+            // Разница только при NaN в любом операнде: dcmpg даёт 1, dcmpl даёт -1.
+            // Для < и <= выбираем 1: последующая проверка результата < 0 или <= 0 ложна.
+            // Для > и >= выбираем -1: проверка > 0 или >= 0 тоже ложна.
+            // Поэтому сравнения порядка с NaN всегда ложны. Для = и /= подходят оба
+            // варианта: ненулевой результат означает, что равенство ложно, а неравенство истинно.
+            code.emit(operator == TokenType.LT || operator == TokenType.LE ? "dcmpg" : "dcmpl");
+        }
+        // Это имена меток в генерируемом коде.
+        // yes — ветка истины; end — общая точка продолжения с готовым boolean на стеке.
+        String yes = code.newLabel();
+        String end = code.newLabel();
+        // Для integer if_icmplt снимает два числа и переходит к yes, если левое < правого.
+        // Для real инструкция iflt снимает один int от dcmpg/dcmpl и переходит, если он < 0.
+        // Остальные condition аналогично задают =, /=, <=, > или >=.
+        // Сам переход НЕ кладёт boolean на стек: после проверки остаётся [...].
+        code.emit((real ? "if" : "if_icmp") + condition + " " + yes);
+        // Если условие ложно, перехода нет: выполняем следующую инструкцию и кладём 0.
+        code.emit("iconst_0");
+        // Пропускаем ветку истины. 
+        code.emit("goto " + end);
+        // Сюда условный переход приводит только при истинном сравнении.
+        code.place(yes);
+        // Кладём 1 вместо пропущенного iconst_0.
+        code.emit("iconst_1");
+        // Обе ветки сходятся со стеком [..., boolean]: добавлено ровно одно значение, 0 или 1.
+        code.place(end);
+    }
+
+    private void emitConcatenation(Code code, BinaryExpression binary) {
+        // allocate a builder for the concatenation result
+        code.emit("new java/lang/StringBuilder");
+        // retain the builder reference after its constructor consumes one copy
+        code.emit("dup");
+        // initialize the empty builder
+        code.emit("invokespecial java/lang/StringBuilder/<init>()V");
+        emitAppend(code, binary.left);
+        emitAppend(code, binary.right);
+        // turn the accumulated contents into an immutable string
+        code.emit("invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;");
+    }
+
+    private void emitAppend(Code code, Expression operand) {
+        emitExpression(code, operand);
+        if (model.typeOf(operand) == PrimitiveType.CHAR) {
+            // append the entire Unicode code point, including supplementary characters
+            code.emit("invokevirtual java/lang/StringBuilder/appendCodePoint(I)Ljava/lang/StringBuilder;");
+        } else {
+            // append the string and leave the builder available for the next operand
+            code.emit("invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
         }
     }
 

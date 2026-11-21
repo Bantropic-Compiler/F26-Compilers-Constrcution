@@ -10,6 +10,8 @@ import compiler.semantic.SemanticTestSupport;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class CodeGeneratorTest {
 
@@ -171,6 +173,65 @@ class CodeGeneratorTest {
                     getfield Rec1/f_label Ljava/lang/String;
                     invokevirtual java/lang/String/length()I
                     putstatic Program/g_length I
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "+7, ldc 7", "-7, ineg", "-2.5, dneg", "not 0, ixor",
+        "7 + 2, iadd", "7 - 2, isub", "7 * 2, imul", "7 / 2, idiv", "7 % 2, irem",
+        "7.0 + 2, dadd", "7 - 2.0, dsub", "7.0 * 2.0, dmul", "7.0 / 2, ddiv",
+        "true and false, iand", "true or false, ior", "true xor false, ixor",
+        "1 and 0, iand"
+    })
+    void emitsUnaryArithmeticAndLogicalOperations(String expression, String instruction) {
+        assertHasLines(program("var result is " + expression), "    " + instruction);
+    }
+
+    @Test
+    void widensOperandsInEvaluationOrder() {
+        String text = program("var a is 3\nvar b is 2.5\nvar result is (a + b) / (b - a)");
+        assertTrue(text.contains("""
+                    getstatic Program/g_a I
+                    i2d
+                    getstatic Program/g_b D
+                    dadd
+                    getstatic Program/g_b D
+                    getstatic Program/g_a I
+                    i2d
+                    dsub
+                    ddiv
+                    putstatic Program/g_result D
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"=, eq, dcmpl", "/=, ne, dcmpl", "<, lt, dcmpg",
+            "<=, le, dcmpg", ">, gt, dcmpl", ">=, ge, dcmpl"})
+    void comparisonsProduceBooleanValues(String operator, String condition, String compare) {
+        String integers = program("var result is 1 " + operator + " 2");
+        assertTrue(integers.contains("    if_icmp" + condition + " L1\n"
+                + "    iconst_0\n    goto L2\nL1:\n    iconst_1\nL2:\n"
+                + "    putstatic Program/g_result I\n"));
+        String reals = program("var result is 1 " + operator + " 2.0");
+        assertHasLines(reals, "    i2d", "    " + compare, "    if" + condition + " L1");
+    }
+
+    @Test
+    void comparesCharactersAndBooleansAsIntegers() {
+        assertHasLines(program("var result is 'a' < 'b'"), "    if_icmplt L1");
+        assertHasLines(program("var result is true /= false"), "    if_icmpne L1");
+    }
+
+    @Test
+    void comparesStringsByContentsAndInvertsInequality() {
+        String text = program("var a is \"a\"\nvar b is \"b\"\nvar eq is a = b\nvar ne is a /= b");
+        assertEquals(2, count(text, "invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z"));
+        assertTrue(text.contains("""
+                    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+                    iconst_1
+                    ixor
+                    putstatic Program/g_ne I
                 """));
     }
 
