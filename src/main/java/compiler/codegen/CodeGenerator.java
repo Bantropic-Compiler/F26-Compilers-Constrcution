@@ -11,6 +11,7 @@ import compiler.ast.expression.ModifiablePrimaryNode;
 import compiler.ast.expression.accessor.FieldAccess;
 import compiler.ast.expression.accessor.IndexAccess;
 import compiler.ast.expression.expression.BinaryExpression;
+import compiler.ast.expression.expression.RoutineCallExpression;
 import compiler.ast.expression.expression.UnaryExpression;
 import compiler.ast.expression.literal.BooleanLiteral;
 import compiler.ast.expression.literal.CharLiteral;
@@ -216,6 +217,8 @@ public final class CodeGenerator {
             emitUnary(code, unary);
         } else if (expression instanceof BinaryExpression binary) {
             emitBinary(code, binary);
+        } else if (expression instanceof RoutineCallExpression call) {
+            emitCall(code, call);
         } else {
             throw new UnsupportedOperationException("Unsupported expression: " + expression.getClass().getSimpleName());
         }
@@ -425,6 +428,19 @@ public final class CodeGenerator {
             code.emit("invokevirtual java/lang/StringBuilder/append(Ljava/lang/String;)Ljava/lang/StringBuilder;");
         }
     }
+
+    private void emitCall(Code code, RoutineCallExpression call) {
+        RoutineSymbol routine = model.routineOf(call);
+        for (int i = 0; i < call.args.size(); i++) {
+            Expression argument = call.args.get(i);
+            emitExpression(code, argument);
+            // Convert while this argument is on top, before evaluating the next one.
+            emitConversion(model.typeOf(argument), routine.parameterTypes().get(i), code);
+        }
+        code.emit("invokestatic " + Jvm.PROGRAM_CLASS + "/" + jvm.methodName(routine.name())
+                + jvm.methodDescriptor(routine.parameterTypes(), routine.returnType()));
+    }
+
 
     private SemanticType globalType(VariableDeclaration variable) {
         return model.variableOf(variable).type();

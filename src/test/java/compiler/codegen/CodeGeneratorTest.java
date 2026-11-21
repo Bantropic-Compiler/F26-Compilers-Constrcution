@@ -155,6 +155,95 @@ class CodeGeneratorTest {
     }
 
     @Test
+    void convertsCallArgumentsInEvaluationOrder() {
+        String text = program("""
+                routine f(a: real, b: integer, c: real, d: integer, e: boolean): real is
+                    return a
+                end
+                var result is f(3, 2.5, true, false, 1)
+                """);
+        assertTrue(text.contains("""
+                    ldc 3
+                    i2d
+                    ldc2_w 2.5
+                    invokestatic java/lang/Math/rint(D)D
+                    d2i
+                    iconst_1
+                    i2d
+                    iconst_0
+                    ldc 1
+                    invokestatic Program/r_f(DIDII)D
+                    putstatic Program/g_result D
+                """));
+    }
+
+    @Test
+    void nestedCallsConvertResultsBeforeEvaluatingNextArgument() {
+        String text = program("""
+                routine first(): integer is
+                    return 3
+                end
+                routine second(): real is
+                    return 2.5
+                end
+                routine combine(a: real, b: integer): integer is
+                    return b
+                end
+                var result: real is combine(first(), second())
+                """);
+        assertTrue(text.contains("""
+                    invokestatic Program/r_first()I
+                    i2d
+                    invokestatic Program/r_second()D
+                    invokestatic java/lang/Math/rint(D)D
+                    d2i
+                    invokestatic Program/r_combine(DI)I
+                    i2d
+                    putstatic Program/g_result D
+                """));
+    }
+
+    @Test
+    void passesReferenceArgumentsWithoutConversion() {
+        String text = program("""
+                type P is record
+                    var x: integer
+                end
+                var p: P
+                var values: array[2] integer
+                routine label(p: P, values: array[2] integer, s: string): string is
+                    return s
+                end
+                var result is label(p, values, "hello")
+                """);
+        assertTrue(text.contains("""
+                    getstatic Program/g_p LRec1;
+                    getstatic Program/g_values [I
+                    ldc "hello"
+                    invokestatic Program/r_label(LRec1;[ILjava/lang/String;)Ljava/lang/String;
+                    putstatic Program/g_result Ljava/lang/String;
+                """));
+    }
+
+    @Test
+    void callUsesForwardDeclaredSignature() {
+        String text = program("""
+                routine f(n: real): real
+                var result is f(7)
+                routine f(n: real): real is
+                    return n
+                end
+                """);
+        assertTrue(text.contains("""
+                    ldc 7
+                    i2d
+                    invokestatic Program/r_f(D)D
+                    putstatic Program/g_result D
+                """));
+        assertEquals(1, count(text, ".method public static r_f(D)D"));
+    }
+
+    @Test
     void readsStringFromRecordArrayUsingOneBasedIndex() {
         String text = program("""
                 type P is record
