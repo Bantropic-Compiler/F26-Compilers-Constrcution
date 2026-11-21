@@ -43,9 +43,9 @@ public final class CodeGenerator {
 
     private String programClass(Program program) {
         StringBuilder text = new StringBuilder();
-        text.append(".bytecode 49.0\n");
-        text.append(".class public ").append(Jvm.PROGRAM_CLASS).append('\n');
-        text.append(".super java/lang/Object\n\n");
+        text.append(".bytecode 49.0\n"); // class file version 49: the old verifier, no stack map frames needed
+        text.append(".class public ").append(Jvm.PROGRAM_CLASS).append('\n'); // class declaration
+        text.append(".super java/lang/Object\n\n"); // every class extends Object
         for (Declaration declaration : program.declarations) {
             if (declaration instanceof VariableDeclaration variable) {
                 text.append(".field public static ").append(jvm.globalName(variable.name))
@@ -67,11 +67,13 @@ public final class CodeGenerator {
             if (declaration instanceof VariableDeclaration variable) {
                 SemanticType type = globalType(variable);
                 emitDefault(code, type);
+
+                // Program.global = default value (pops the value)
                 code.emit("putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(variable.name)
                         + " " + jvm.descriptor(type));
             }
         }
-        code.emit("return");
+        code.emit("return"); // end of the static initializer
         return method(".method static <clinit>()V", code);
     }
 
@@ -92,6 +94,7 @@ public final class CodeGenerator {
         if (returnType != VoidType.INSTANCE) {
             emitDefault(code, returnType);
         }
+        // return the default value: return for void, ireturn, dreturn or areturn otherwise
         code.emit(returnType == VoidType.INSTANCE ? "return" : jvm.prefix(returnType) + "return");
     }
 
@@ -99,22 +102,23 @@ public final class CodeGenerator {
         String name = jvm.recordClass(record);
         Code code = new Code();
         code.newLocal(1);
-        code.emit("aload 0");
+        code.emit("aload 0"); // push this
+        // call the constructor of Object, required in every constructor
         code.emit("invokespecial java/lang/Object/<init>()V");
         StringBuilder fields = new StringBuilder();
         for (Map.Entry<String, SemanticType> field : record.fields().entrySet()) {
             String fieldName = jvm.fieldName(field.getKey());
             String descriptor = jvm.descriptor(field.getValue());
             fields.append(".field public ").append(fieldName).append(' ').append(descriptor).append('\n');
-            code.emit("aload 0");
+            code.emit("aload 0"); // push this, the object whose field is assigned
             emitDefault(code, field.getValue());
-            code.emit("putfield " + name + "/" + fieldName + " " + descriptor);
+            code.emit("putfield " + name + "/" + fieldName + " " + descriptor); // this.field = default value (pops this and the value)
         }
-        code.emit("return");
+        code.emit("return"); // end of the constructor
         StringBuilder text = new StringBuilder();
-        text.append(".bytecode 49.0\n");
-        text.append(".class public ").append(name).append('\n');
-        text.append(".super java/lang/Object\n\n");
+        text.append(".bytecode 49.0\n"); // class file version 49: the old verifier, no stack map frames needed
+        text.append(".class public ").append(name).append('\n'); // class declaration
+        text.append(".super java/lang/Object\n\n"); // every class extends Object
         text.append(fields).append('\n');
         text.append(method(".method public <init>()V", code));
         return text.toString();
@@ -123,15 +127,18 @@ public final class CodeGenerator {
     /** Pushes the default value of a type: zero, empty string, new record or filled array. */
     private void emitDefault(Code code, SemanticType type) {
         if (type == PrimitiveType.REAL) {
-            code.emit("dconst_0");
+            code.emit("dconst_0"); // push 0.0
         } else if (type instanceof PrimitiveType) {
-            code.emit("iconst_0");
+            code.emit("iconst_0"); // push 0, also false and char 0
         } else if (type == StringType.INSTANCE) {
-            code.emit("ldc \"\"");
+            code.emit("ldc \"\""); // push the empty string
         } else if (type instanceof RecordType record) {
             String name = jvm.recordClass(record);
+            // create an uninitialized record object
             code.emit("new " + name);
+            // duplicate the reference, one copy is consumed by the constructor call
             code.emit("dup");
+            // call the record constructor, which fills all fields with defaults
             code.emit("invokespecial " + name + "/<init>()V");
         } else if (type instanceof ArrayType array) {
             emitDefaultArray(code, array);
@@ -143,27 +150,29 @@ public final class CodeGenerator {
     private void emitDefaultArray(Code code, ArrayType array) {
         SemanticType element = array.elementType();
         int size = (int) array.size();
-        code.emit("ldc " + size);
+        code.emit("ldc " + size); // push the array size
         if (element instanceof PrimitiveType) {
+            // numeric array is created already filled with zeros by the JVM
             code.emit("newarray " + (element == PrimitiveType.REAL ? "double" : "int"));
             return;
         }
+        // array of references (strings, records, arrays), all elements are null for now
         code.emit("anewarray " + jvm.className(element));
         int index = code.newLocal(1);
         String start = code.newLabel();
         String end = code.newLabel();
-        code.emit("iconst_0");
-        code.emit("istore " + index);
+        code.emit("iconst_0"); // i = 0
+        code.emit("istore " + index); // store i into a local slot
         code.place(start);
-        code.emit("iload " + index);
+        code.emit("iload " + index); // loop start: if i >= size jump to the end
         code.emit("ldc " + size);
         code.emit("if_icmpge " + end);
-        code.emit("dup");
-        code.emit("iload " + index);
+        code.emit("dup"); // duplicate the array reference, so one copy stays on the stack after aastore
+        code.emit("iload " + index); // push index i
         emitDefault(code, element);
-        code.emit("aastore");
-        code.emit("iinc " + index + " 1");
-        code.emit("goto " + start);
+        code.emit("aastore"); // array[i] = default value (pops array, index and value)
+        code.emit("iinc " + index + " 1"); // i = i + 1
+        code.emit("goto " + start); // jump back to the loop start
         code.place(end);
     }
 
@@ -173,9 +182,9 @@ public final class CodeGenerator {
 
     private String method(String header, Code code) {
         return header + "\n"
-                + ".limit stack " + MAX_STACK + "\n"
-                + ".limit locals " + code.maxLocals() + "\n"
+                + ".limit stack " + MAX_STACK + "\n" // stack limit of the method, a fixed value
+                + ".limit locals " + code.maxLocals() + "\n" // number of local variable slots: this or parameters plus temporaries
                 + code.text()
-                + ".end method\n";
+                + ".end method\n"; // end of the method
     }
 }
