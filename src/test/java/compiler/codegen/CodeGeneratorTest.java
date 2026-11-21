@@ -149,6 +149,101 @@ class CodeGeneratorTest {
     }
 
     @Test
+    void localDeclarationsInitializeSlotsInSourceOrder() {
+        String text = program("""
+                routine f(seed: integer) is
+                    var count is seed
+                    type Measure is real
+                    var value: Measure is count
+                    var label: string
+                end
+                """);
+        assertTrue(text.contains("""
+                .limit locals 5
+                    iload 0
+                    istore 1
+                    iload 1
+                    i2d
+                    dstore 2
+                    ldc ""
+                    astore 4
+                    return
+                """));
+    }
+
+    @Test
+    void evaluatesNestedAssignmentTargetOnceBeforeValue() {
+        String text = program("""
+                type Row is record
+                    var values: array[2] real
+                end
+                var rows: array[2] Row
+                routine index(): integer => 1
+                routine value(): integer => 7
+                routine update() is
+                    rows[index()].values[index()] := value()
+                    return
+                end
+                """);
+        assertTrue(text.contains("""
+                    getstatic Program/g_rows [LRec1;
+                    invokestatic Program/r_index()I
+                    iconst_1
+                    isub
+                    aaload
+                    getfield Rec1/f_values [D
+                    invokestatic Program/r_index()I
+                    iconst_1
+                    isub
+                    invokestatic Program/r_value()I
+                    i2d
+                    dastore
+                    return
+                .end method
+                """));
+    }
+
+    @Test
+    void storesLocalsGlobalsAndFieldsWithConversions() {
+        String text = program("""
+                type Box is record
+                    var n: integer
+                end
+                var total: real
+                routine update(box: Box): Box is
+                    var n: integer
+                    n := 2.5
+                    total := n
+                    box.n := n
+                    return box
+                end
+                """);
+        assertTrue(text.contains("""
+                    ldc2_w 2.5
+                    invokestatic java/lang/Math/rint(D)D
+                    d2i
+                    istore 1
+                    iload 1
+                    i2d
+                    putstatic Program/g_total D
+                    aload 0
+                    iload 1
+                    putfield Rec1/f_n I
+                    aload 0
+                    areturn
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"integer, real, iload, i2d, dreturn",
+                "real, integer, dload, invokestatic java/lang/Math/rint(D)D, ireturn"})
+    void convertsReturnValueToDeclaredType(String source, String target, String load,
+                                           String conversion, String instruction) {
+        String text = program("routine f(x: " + source + "): " + target + " => x");
+        assertHasLines(text, "    " + load + " 0", "    " + conversion, "    " + instruction);
+    }
+
+    @Test
     void forwardDeclarationIsEmittedOnce() {
         String text = program("routine g(n: integer)\nroutine g(n: integer) is\nend\n");
         assertEquals(1, count(text, ".method public static r_g(I)V"));

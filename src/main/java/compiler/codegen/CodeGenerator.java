@@ -1,5 +1,7 @@
 package compiler.codegen;
 
+import compiler.ast.BlockNode;
+import compiler.ast.Node;
 import compiler.ast.Program;
 import compiler.ast.declaration.Declaration;
 import compiler.ast.declaration.Parameter;
@@ -18,6 +20,8 @@ import compiler.ast.expression.literal.CharLiteral;
 import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.ast.expression.literal.RealLiteral;
 import compiler.ast.expression.literal.StringLiteral;
+import compiler.ast.statement.AssignmentStatement;
+import compiler.ast.statement.routine.ReturnStatement;
 import compiler.lexer.TokenType;
 import compiler.semantic.symbol.VariableSymbol;
 import compiler.semantic.SemanticModel;
@@ -81,12 +85,7 @@ public final class CodeGenerator {
         for (Declaration declaration : program.declarations) {
             if (declaration instanceof VariableDeclaration variable) {
                 SemanticType type = globalType(variable);
-                if (variable.initializer == null) {
-                    emitDefault(code, type);
-                } else {
-                    emitExpression(code, variable.initializer);
-                    emitConversion(model.typeOf(variable.initializer), type, code);
-                }
+                emitInitialValue(code, variable, type);
                 // store the initializer or default value in the global field
                 code.emit("putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(variable.name)
                         + " " + jvm.descriptor(type));
@@ -108,13 +107,20 @@ public final class CodeGenerator {
         return method(header, code);
     }
 
-    /** Fills the method body: for now only the default return value. */
     private void emitBody(RoutineDeclaration routine, SemanticType returnType, Code code) {
+        // emitBlock() is true when it reaches `return` statement
+        // for void functions it returns false and then we add some defualt return
+        if (emitBlock(code, routine.body, returnType)) {
+            return;
+        }
+
+        // TODO: Add if/else generation and delete with branch
         if (returnType != VoidType.INSTANCE) {
             emitDefault(code, returnType);
         }
-        // return the default value: return for void, ireturn, dreturn or areturn otherwise
-        code.emit(returnType == VoidType.INSTANCE ? "return" : jvm.prefix(returnType) + "return");
+
+        // Return for void
+        emitReturnInstruction(code, returnType);
     }
 
     private String recordClass(RecordType record) {
@@ -212,7 +218,7 @@ public final class CodeGenerator {
             // push the string literal
             code.emit("ldc " + jvm.quote(s.value));
         } else if (expression instanceof ModifiablePrimaryNode variable) {
-            emitRead(code, variable);
+            emitRead(code, variable, variable.accessors.size());
         } else if (expression instanceof UnaryExpression unary) {
             emitUnary(code, unary);
         } else if (expression instanceof BinaryExpression binary) {
@@ -224,7 +230,7 @@ public final class CodeGenerator {
         }
     }
 
-    private void emitRead(Code code, ModifiablePrimaryNode variable) {
+    private SemanticType emitRead(Code code, ModifiablePrimaryNode variable, int accessorCount) {
         VariableSymbol symbol = model.variableOf(variable);
         SemanticType type = symbol.type();
         if (symbol.kind() == VariableSymbol.Kind.GLOBAL) {
@@ -235,13 +241,10 @@ public final class CodeGenerator {
             // load the local variable or parameter from its slot
             code.emit(jvm.prefix(type) + "load " + code.slotOf(symbol));
         }
-        for (Accessor accessor : variable.accessors) {
+        for (int i = 0; i < accessorCount; i++) {
+            Accessor accessor = variable.accessors.get(i);
             if (accessor instanceof IndexAccess index) {
-                emitExpression(code, index.index);
-                // push the offset between source and JVM indices
-                code.emit("iconst_1");
-                // subtract one to obtain the zero-based JVM index
-                code.emit("isub");
+                emitIndex(code, index);
                 if (type instanceof ArrayType array) {
                     type = array.elementType();
                     // load the array element using the opcode for its type
@@ -264,6 +267,43 @@ public final class CodeGenerator {
                 }
             }
         }
+        return type;
+    }
+
+    private void emitIndex(Code code, IndexAccess index) {
+        emitExpression(code, index.index);
+        code.emit("iconst_1");
+        code.emit("isub");
+    }
+
+    private void emitAssignment(Code code, AssignmentStatement assignment) {
+        ModifiablePrimaryNode target = assignment.target;
+        SemanticType type = model.typeOf(target);
+        String store;
+        if (target.accessors.isEmpty()) {
+            VariableSymbol symbol = model.variableOf(target);
+            if (symbol.kind() == VariableSymbol.Kind.GLOBAL) {
+                store = "putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(symbol.name())
+                        + " " + jvm.descriptor(type);
+            } else {
+                store = jvm.prefix(type) + "store " + code.slotOf(symbol);
+            }
+        } else {
+            int last = target.accessors.size() - 1;
+            SemanticType owner = emitRead(code, target, last);
+            Accessor accessor = target.accessors.get(last);
+            if (accessor instanceof FieldAccess field && owner instanceof RecordType record) {
+                store = "putfield " + jvm.recordClass(record) + "/" + jvm.fieldName(field.name)
+                        + " " + jvm.descriptor(type);
+            } else if (accessor instanceof IndexAccess index && owner instanceof ArrayType) {
+                emitIndex(code, index);
+                store = jvm.prefix(type) + "astore";
+            } else {
+                throw new IllegalArgumentException("invalid assignment target");
+            }
+        }
+        emitConvertedExpression(code, assignment.value, type);
+        code.emit(store);
     }
 
     private void emitUnary(Code code, UnaryExpression unary) {
@@ -424,12 +464,47 @@ public final class CodeGenerator {
         RoutineSymbol routine = model.routineOf(call);
         for (int i = 0; i < call.args.size(); i++) {
             Expression argument = call.args.get(i);
-            emitExpression(code, argument);
-            // Convert while this argument is on top, before evaluating the next one.
-            emitConversion(model.typeOf(argument), routine.parameterTypes().get(i), code);
+            emitConvertedExpression(code, argument, routine.parameterTypes().get(i));
         }
         code.emit("invokestatic " + Jvm.PROGRAM_CLASS + "/" + jvm.methodName(routine.name())
                 + jvm.methodDescriptor(routine.parameterTypes(), routine.returnType()));
+    }
+
+    private boolean emitBlock(Code code, BlockNode block, SemanticType returnType) {
+        for (Node item : block.items) {
+            if (item instanceof VariableDeclaration variable) {
+                VariableSymbol symbol = model.variableOf(variable);
+                int slot = code.declare(symbol);
+                emitInitialValue(code, variable, symbol.type());
+                code.emit(jvm.prefix(symbol.type()) + "store " + slot);
+            } else if (item instanceof AssignmentStatement assignment) {
+                emitAssignment(code, assignment);
+            } else if (item instanceof ReturnStatement statement) {
+                if (statement.value != null) {
+                    emitConvertedExpression(code, statement.value, returnType);
+                }
+                emitReturnInstruction(code, returnType);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void emitReturnInstruction(Code code, SemanticType type) {
+        code.emit(type == VoidType.INSTANCE ? "return" : jvm.prefix(type) + "return");
+    }
+
+    private void emitConvertedExpression(Code code, Expression value, SemanticType type) {
+        emitExpression(code, value);
+        emitConversion(model.typeOf(value), type, code);
+    }
+
+    private void emitInitialValue(Code code, VariableDeclaration variable, SemanticType type) {
+        if (variable.initializer == null) {
+            emitDefault(code, type);
+        } else {
+            emitConvertedExpression(code, variable.initializer, type);
+        }
     }
 
 
