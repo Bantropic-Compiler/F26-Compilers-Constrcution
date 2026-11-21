@@ -84,16 +84,7 @@ public final class CodeGenerator {
                     emitDefault(code, type);
                 } else {
                     emitExpression(code, variable.initializer);
-                    SemanticType source = model.typeOf(variable.initializer);
-                    if (type == PrimitiveType.REAL && source != PrimitiveType.REAL) {
-                        // convert the integer or boolean initializer to double
-                        code.emit("i2d");
-                    } else if (type == PrimitiveType.INTEGER && source == PrimitiveType.REAL) {
-                        // round to the nearest integer, choosing the even integer for ties
-                        code.emit("invokestatic java/lang/Math/rint(D)D");
-                        // convert the rounded double to int
-                        code.emit("d2i");
-                    }
+                    emitConversion(model.typeOf(variable.initializer), type, code);
                 }
                 // store the initializer or default value in the global field
                 code.emit("putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(variable.name)
@@ -342,9 +333,25 @@ public final class CodeGenerator {
 
     private void emitOperand(Code code, Expression operand, boolean real) {
         emitExpression(code, operand);
-        if (real && model.typeOf(operand) == PrimitiveType.INTEGER) {
+        if (real) {
             // widen this operand before evaluating the next one, preserving stack order
+            emitConversion(model.typeOf(operand), PrimitiveType.REAL, code);
+        }
+    }
+
+    /**
+     * Converts the value on top of the stack; semantic analysis must have approved the conversion.
+     * Boolean/integer conversions and compatible reference types need no JVM instructions.
+     * In particular, integer-to-boolean is already restricted to constants 0 and 1.
+     */
+    private void emitConversion(SemanticType sourceType, SemanticType targetType, Code code) {
+        if (targetType == PrimitiveType.REAL
+                && (sourceType == PrimitiveType.INTEGER || sourceType == PrimitiveType.BOOLEAN)) {
             code.emit("i2d");
+        } else if (targetType == PrimitiveType.INTEGER && sourceType == PrimitiveType.REAL) {
+            // round to the nearest integer, choosing the even integer for ties
+            code.emit("invokestatic java/lang/Math/rint(D)D");
+            code.emit("d2i");
         }
     }
 

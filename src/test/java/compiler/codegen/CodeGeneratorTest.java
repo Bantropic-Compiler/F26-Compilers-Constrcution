@@ -206,6 +206,36 @@ class CodeGeneratorTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+        "integer, real, 3, D, i2d",
+        "boolean, real, true, D, i2d",
+        "real, integer, 2.5, I, round",
+        "boolean, integer, true, I, none",
+        "integer, integer, 3, I, none",
+        "real, real, 2.5, D, none"
+    })
+    void convertsGlobalInitializers(String sourceType, String targetType, String value,
+            String descriptor, String conversion) {
+        String text = program("var source: " + sourceType + " is " + value
+                + "\nvar result: " + targetType + " is source");
+        String instructions = switch (conversion) {
+            case "i2d" -> "    i2d\n";
+            case "round" -> "    invokestatic java/lang/Math/rint(D)D\n    d2i\n";
+            default -> "";
+        };
+        String sourceDescriptor = sourceType.equals("real") ? "D" : "I";
+        assertTrue(text.contains("    getstatic Program/g_source " + sourceDescriptor + "\n"
+                + instructions + "    putstatic Program/g_result " + descriptor + "\n"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0", "1"})
+    void booleanConstantsNeedNoConversion(int value) {
+        assertTrue(program("var result: boolean is " + value).contains(
+                "    ldc " + value + "\n    putstatic Program/g_result I\n"));
+    }
+
+    @ParameterizedTest
     @CsvSource({"=, eq, dcmpl", "/=, ne, dcmpl", "<, lt, dcmpg",
             "<=, le, dcmpg", ">, gt, dcmpl", ">=, ge, dcmpl"})
     void comparisonsProduceBooleanValues(String operator, String condition, String compare) {
