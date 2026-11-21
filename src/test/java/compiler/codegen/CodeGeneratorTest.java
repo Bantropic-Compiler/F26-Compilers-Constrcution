@@ -172,6 +172,117 @@ class CodeGeneratorTest {
     }
 
     @Test
+    void ifWithoutElseFallsThroughOnFalse() {
+        String text = program("""
+                routine f(flag: boolean): integer is
+                    if flag then return 1 end
+                    return 2
+                end
+                """);
+        assertTrue(text.contains("""
+                    iload 0
+                    ifeq L1
+                    ldc 1
+                    ireturn
+                L1:
+                    ldc 2
+                    ireturn
+                .end method
+                """));
+    }
+
+    @Test
+    void returningBranchesEndRoutine() {
+        String text = program("""
+                routine f(flag: boolean): integer is
+                    if flag then return 1 else return 2 end
+                    return 3
+                end
+                """);
+        assertTrue(text.contains("""
+                    iload 0
+                    ifeq L1
+                    ldc 1
+                    ireturn
+                L1:
+                    ldc 2
+                    ireturn
+                .end method
+                """));
+    }
+
+    @Test
+    void whileChecksConditionBeforeEachIterationAndThenBranchSkipsElse() {
+        String text = program("""
+                var n: integer
+                routine f(flag: boolean) is
+                    while n > 0 loop
+                        if flag then n := n - 1 else n := 0 end
+                    end
+                end
+                """);
+        assertTrue(text.contains("""
+                L1:
+                    getstatic Program/g_n I
+                    ldc 0
+                """));
+        assertTrue(text.contains("""
+                    ifeq L2
+                    iload 0
+                    ifeq L5
+                    getstatic Program/g_n I
+                    ldc 1
+                    isub
+                    putstatic Program/g_n I
+                    goto L6
+                L5:
+                    ldc 0
+                    putstatic Program/g_n I
+                L6:
+                    goto L1
+                L2:
+                    return
+                .end method
+                """));
+    }
+
+    @Test
+    void breakAndContinueTargetTheNearestWhile() {
+        String text = program("""
+                routine f(outer: boolean, inner: boolean, stop: boolean) is
+                    while outer loop
+                        while inner loop
+                            if stop then break else continue end
+                        end
+                        if stop then continue else break end
+                    end
+                end
+                """);
+        assertTrue(text.contains("""
+                L1:
+                    iload 0
+                    ifeq L2
+                L3:
+                    iload 1
+                    ifeq L4
+                    iload 2
+                    ifeq L5
+                    goto L4
+                L5:
+                    goto L3
+                L4:
+                    iload 2
+                    ifeq L6
+                    goto L1
+                L6:
+                    goto L2
+                L2:
+                    return
+                .end method
+                """));
+    }
+
+    @Test
     void evaluatesNestedAssignmentTargetOnceBeforeValue() {
         String text = program("""
                 type Row is record

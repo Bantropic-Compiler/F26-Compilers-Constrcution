@@ -21,6 +21,10 @@ import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.ast.expression.literal.RealLiteral;
 import compiler.ast.expression.literal.StringLiteral;
 import compiler.ast.statement.AssignmentStatement;
+import compiler.ast.statement.IfStatement;
+import compiler.ast.statement.loop.BreakStatement;
+import compiler.ast.statement.loop.ContinueStatement;
+import compiler.ast.statement.loop.WhileStatement;
 import compiler.ast.statement.routine.ReturnStatement;
 import compiler.lexer.TokenType;
 import compiler.semantic.symbol.VariableSymbol;
@@ -108,19 +112,10 @@ public final class CodeGenerator {
     }
 
     private void emitBody(RoutineDeclaration routine, SemanticType returnType, Code code) {
-        // emitBlock() is true when it reaches `return` statement
-        // for void functions it returns false and then we add some defualt return
-        if (emitBlock(code, routine.body, returnType)) {
-            return;
+        if (!emitBlock(code, routine.body, returnType, null)) {
+            // Semantic analysis requires every path in a value-returning routine to return.
+            code.emit("return");
         }
-
-        // TODO: Add if/else generation and delete with branch
-        if (returnType != VoidType.INSTANCE) {
-            emitDefault(code, returnType);
-        }
-
-        // Return for void
-        emitReturnInstruction(code, returnType);
     }
 
     private String recordClass(RecordType record) {
@@ -470,7 +465,10 @@ public final class CodeGenerator {
                 + jvm.methodDescriptor(routine.parameterTypes(), routine.returnType()));
     }
 
-    private boolean emitBlock(Code code, BlockNode block, SemanticType returnType) {
+    private record LoopLabels(String check, String exit) {}
+
+    /** Returns true when no path falls through to the next statement. */
+    private boolean emitBlock(Code code, BlockNode block, SemanticType returnType, LoopLabels loop) {
         for (Node item : block.items) {
             if (item instanceof VariableDeclaration variable) {
                 VariableSymbol symbol = model.variableOf(variable);
@@ -479,6 +477,18 @@ public final class CodeGenerator {
                 code.emit(jvm.prefix(symbol.type()) + "store " + slot);
             } else if (item instanceof AssignmentStatement assignment) {
                 emitAssignment(code, assignment);
+            } else if (item instanceof IfStatement statement) {
+                if (emitIf(code, statement, returnType, loop)) {
+                    return true;
+                }
+            } else if (item instanceof WhileStatement statement) {
+                emitWhile(code, statement, returnType);
+            } else if (item instanceof BreakStatement) {
+                code.emit("goto " + loop.exit());
+                return true;
+            } else if (item instanceof ContinueStatement) {
+                code.emit("goto " + loop.check());
+                return true;
             } else if (item instanceof ReturnStatement statement) {
                 if (statement.value != null) {
                     emitConvertedExpression(code, statement.value, returnType);
@@ -488,6 +498,39 @@ public final class CodeGenerator {
             }
         }
         return false;
+    }
+
+    private boolean emitIf(Code code, IfStatement statement, SemanticType returnType, LoopLabels loop) {
+        String onFalse = code.newLabel();
+        emitExpression(code, statement.condition);
+        code.emit("ifeq " + onFalse);
+        boolean thenStops = emitBlock(code, statement.thenBody, returnType, loop);
+        if (statement.elseBody == null) {
+            code.place(onFalse);
+            return false;
+        }
+        if (thenStops) {
+            code.place(onFalse);
+            return emitBlock(code, statement.elseBody, returnType, loop);
+        }
+
+        String end = code.newLabel();
+        code.emit("goto " + end);
+        code.place(onFalse);
+        emitBlock(code, statement.elseBody, returnType, loop);
+        code.place(end);
+        return false;
+    }
+
+    private void emitWhile(Code code, WhileStatement statement, SemanticType returnType) {
+        LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
+        code.place(loop.check());
+        emitExpression(code, statement.condition);
+        code.emit("ifeq " + loop.exit());
+        if (!emitBlock(code, statement.body, returnType, loop)) {
+            code.emit("goto " + loop.check());
+        }
+        code.place(loop.exit());
     }
 
     private void emitReturnInstruction(Code code, SemanticType type) {
