@@ -152,6 +152,28 @@ class CodeGeneratorTest {
         assertEquals(1, count(text, ".method public static r_g(I)V"));
     }
 
+    @Test
+    void readsStringFromRecordArrayUsingOneBasedIndex() {
+        String text = program("""
+                type P is record
+                    var label: string
+                end
+                var items: array[2] P
+                var i is 2
+                var length is items[i].label.size
+                """);
+        assertTrue(text.contains("""
+                    getstatic Program/g_items [LRec1;
+                    getstatic Program/g_i I
+                    iconst_1
+                    isub
+                    aaload
+                    getfield Rec1/f_label Ljava/lang/String;
+                    invokevirtual java/lang/String/length()I
+                    putstatic Program/g_length I
+                """));
+    }
+
     private static int count(String text, String part) {
         int count = 0;
         int from = text.indexOf(part);

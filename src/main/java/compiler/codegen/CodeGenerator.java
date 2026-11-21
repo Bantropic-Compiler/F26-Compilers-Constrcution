@@ -5,6 +5,17 @@ import compiler.ast.declaration.Declaration;
 import compiler.ast.declaration.Parameter;
 import compiler.ast.declaration.RoutineDeclaration;
 import compiler.ast.declaration.VariableDeclaration;
+import compiler.ast.expression.Accessor;
+import compiler.ast.expression.Expression;
+import compiler.ast.expression.ModifiablePrimaryNode;
+import compiler.ast.expression.accessor.FieldAccess;
+import compiler.ast.expression.accessor.IndexAccess;
+import compiler.ast.expression.literal.BooleanLiteral;
+import compiler.ast.expression.literal.CharLiteral;
+import compiler.ast.expression.literal.IntegerLiteral;
+import compiler.ast.expression.literal.RealLiteral;
+import compiler.ast.expression.literal.StringLiteral;
+import compiler.semantic.symbol.VariableSymbol;
 import compiler.semantic.SemanticModel;
 import compiler.semantic.symbol.RoutineSymbol;
 import compiler.semantic.type.ArrayType;
@@ -66,9 +77,22 @@ public final class CodeGenerator {
         for (Declaration declaration : program.declarations) {
             if (declaration instanceof VariableDeclaration variable) {
                 SemanticType type = globalType(variable);
-                emitDefault(code, type);
-
-                // Program.global = default value (pops the value)
+                if (variable.initializer == null) {
+                    emitDefault(code, type);
+                } else {
+                    emitExpression(code, variable.initializer);
+                    SemanticType source = model.typeOf(variable.initializer);
+                    if (type == PrimitiveType.REAL && source != PrimitiveType.REAL) {
+                        // convert the integer or boolean initializer to double
+                        code.emit("i2d");
+                    } else if (type == PrimitiveType.INTEGER && source == PrimitiveType.REAL) {
+                        // round to the nearest integer, choosing the even integer for ties
+                        code.emit("invokestatic java/lang/Math/rint(D)D");
+                        // convert the rounded double to int
+                        code.emit("d2i");
+                    }
+                }
+                // store the initializer or default value in the global field
                 code.emit("putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(variable.name)
                         + " " + jvm.descriptor(type));
             }
@@ -174,6 +198,71 @@ public final class CodeGenerator {
         code.emit("iinc " + index + " 1"); // i = i + 1
         code.emit("goto " + start); // jump back to the loop start
         code.place(end);
+    }
+
+    void emitExpression(Code code, Expression expression) {
+        if (expression instanceof IntegerLiteral n) {
+            // push the 32-bit integer literal
+            code.emit("ldc " + (int) n.value);
+        } else if (expression instanceof RealLiteral n) {
+            // push the double literal
+            code.emit("ldc2_w " + n.value);
+        } else if (expression instanceof BooleanLiteral b) {
+            // push 1 for true or 0 for false
+            code.emit(b.value ? "iconst_1" : "iconst_0");
+        } else if (expression instanceof CharLiteral c) {
+            // push the Unicode code point as an integer
+            code.emit("ldc " + c.codePoint);
+        } else if (expression instanceof StringLiteral s) {
+            // push the string literal
+            code.emit("ldc " + jvm.quote(s.value));
+        } else if (expression instanceof ModifiablePrimaryNode variable) {
+            emitRead(code, variable);
+        } else {
+            throw new UnsupportedOperationException("Unsupported expression: " + expression.getClass().getSimpleName());
+        }
+    }
+
+    private void emitRead(Code code, ModifiablePrimaryNode variable) {
+        VariableSymbol symbol = model.variableOf(variable);
+        SemanticType type = symbol.type();
+        if (symbol.kind() == VariableSymbol.Kind.GLOBAL) {
+            // load the global variable from its static field
+            code.emit("getstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(symbol.name())
+                    + " " + jvm.descriptor(type));
+        } else {
+            // load the local variable or parameter from its slot
+            code.emit(jvm.prefix(type) + "load " + code.slotOf(symbol));
+        }
+        for (Accessor accessor : variable.accessors) {
+            if (accessor instanceof IndexAccess index) {
+                emitExpression(code, index.index);
+                // push the offset between source and JVM indices
+                code.emit("iconst_1");
+                // subtract one to obtain the zero-based JVM index
+                code.emit("isub");
+                if (type instanceof ArrayType array) {
+                    type = array.elementType();
+                    // load the array element using the opcode for its type
+                    code.emit(jvm.prefix(type) + "aload");
+                } else {
+                    // load the UTF-16 code unit at the given index
+                    code.emit("invokevirtual java/lang/String/charAt(I)C");
+                    type = PrimitiveType.CHAR;
+                }
+            } else if (accessor instanceof FieldAccess field) {
+                if (type instanceof RecordType record) {
+                    type = record.fieldType(field.name);
+                    // read the field from the record on the stack
+                    code.emit("getfield " + jvm.recordClass(record) + "/" + jvm.fieldName(field.name)
+                            + " " + jvm.descriptor(type));
+                } else {
+                    // get the array length or the number of UTF-16 code units in the string
+                    code.emit(type instanceof ArrayType ? "arraylength" : "invokevirtual java/lang/String/length()I");
+                    type = PrimitiveType.INTEGER;
+                }
+            }
+        }
     }
 
     private SemanticType globalType(VariableDeclaration variable) {
