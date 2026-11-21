@@ -22,11 +22,13 @@ import compiler.ast.expression.literal.RealLiteral;
 import compiler.ast.expression.literal.StringLiteral;
 import compiler.ast.statement.AssignmentStatement;
 import compiler.ast.statement.IfStatement;
+import compiler.ast.statement.PrintStatement;
 import compiler.ast.statement.loop.BreakStatement;
 import compiler.ast.statement.loop.ContinueStatement;
 import compiler.ast.statement.loop.ForStatement;
 import compiler.ast.statement.loop.WhileStatement;
 import compiler.ast.statement.routine.ReturnStatement;
+import compiler.ast.statement.routine.RoutineCallStatement;
 import compiler.lexer.TokenType;
 import compiler.semantic.symbol.VariableSymbol;
 import compiler.semantic.SemanticModel;
@@ -220,7 +222,7 @@ public final class CodeGenerator {
         } else if (expression instanceof BinaryExpression binary) {
             emitBinary(code, binary);
         } else if (expression instanceof RoutineCallExpression call) {
-            emitCall(code, call);
+            emitCall(code, model.routineOf(call), call.args);
         } else {
             throw new UnsupportedOperationException("Unsupported expression: " + expression.getClass().getSimpleName());
         }
@@ -456,10 +458,9 @@ public final class CodeGenerator {
         }
     }
 
-    private void emitCall(Code code, RoutineCallExpression call) {
-        RoutineSymbol routine = model.routineOf(call);
-        for (int i = 0; i < call.args.size(); i++) {
-            Expression argument = call.args.get(i);
+    private void emitCall(Code code, RoutineSymbol routine, List<Expression> arguments) {
+        for (int i = 0; i < arguments.size(); i++) {
+            Expression argument = arguments.get(i);
             emitConvertedExpression(code, argument, routine.parameterTypes().get(i));
         }
         code.emit("invokestatic " + Jvm.PROGRAM_CLASS + "/" + jvm.methodName(routine.name())
@@ -478,6 +479,14 @@ public final class CodeGenerator {
                 code.emit(jvm.prefix(symbol.type()) + "store " + slot);
             } else if (item instanceof AssignmentStatement assignment) {
                 emitAssignment(code, assignment);
+            } else if (item instanceof PrintStatement statement) {
+                emitPrint(code, statement);
+            } else if (item instanceof RoutineCallStatement call) {
+                RoutineSymbol routine = model.routineOf(call);
+                emitCall(code, routine, call.args);
+                if (routine.returnType() != VoidType.INSTANCE) {
+                    code.emit(routine.returnType() == PrimitiveType.REAL ? "pop2" : "pop");
+                }
             } else if (item instanceof IfStatement statement) {
                 if (emitIf(code, statement, returnType, loop)) {
                     return true;
@@ -626,6 +635,31 @@ public final class CodeGenerator {
         }
     }
 
+    private void emitPrint(Code code, PrintStatement statement) {
+        String output = "getstatic java/lang/System/out Ljava/io/PrintStream;";
+        String print = "invokevirtual java/io/PrintStream/print";
+        for (int i = 0; i < statement.args.size(); i++) {
+            if (i > 0) {
+                code.emit(output);
+                code.emit("ldc 32");
+                code.emit(print + "(C)V");
+            }
+            Expression argument = statement.args.get(i);
+            SemanticType type = model.typeOf(argument);
+            code.emit(output);
+            String descriptor;
+            if (type == PrimitiveType.CHAR) {
+                emitStringOperand(code, argument);
+                descriptor = jvm.descriptor(StringType.INSTANCE);
+            } else {
+                emitExpression(code, argument);
+                descriptor = type == PrimitiveType.BOOLEAN ? "Z" : jvm.descriptor(type);
+            }
+            code.emit(print + "(" + descriptor + ")V");
+        }
+        code.emit(output);
+        code.emit("invokevirtual java/io/PrintStream/println()V");
+    }
 
     private SemanticType globalType(VariableDeclaration variable) {
         return model.variableOf(variable).type();

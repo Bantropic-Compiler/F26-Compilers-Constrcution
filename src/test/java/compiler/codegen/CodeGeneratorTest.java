@@ -426,6 +426,52 @@ class CodeGeneratorTest {
     }
 
     @Test
+    void printsScalarArgumentsWithSpacesAndOneNewline() {
+        String text = program("""
+                routine show() is
+                    print 7, 2.5, true, '😀', "end"
+                end
+                """);
+        String print = "invokevirtual java/io/PrintStream/print";
+        assertHasLines(text, "    " + print + "(I)V", "    " + print + "(D)V",
+                "    " + print + "(Z)V", "    ldc 128512",
+                "    invokestatic java/lang/Character/toString(I)Ljava/lang/String;");
+        assertEquals(2, count(text, print + "(Ljava/lang/String;)V"));
+        assertEquals(4, count(text, "ldc 32\n    " + print + "(C)V"));
+        assertEquals(1, count(text, print + "ln()V"));
+        assertTrue(text.contains("ldc \"end\"\n    " + print + "(Ljava/lang/String;)V\n"
+                + "    getstatic java/lang/System/out Ljava/io/PrintStream;\n    " + print + "ln()V"));
+    }
+
+    @Test
+    void discardsOnlyResultsOfStatementCalls() {
+        String text = program("""
+                routine number(x: real): real is
+                    return x
+                end
+                routine label(): string is
+                    return "ok"
+                end
+                routine noop() is
+                end
+                routine run() is
+                    number(1)
+                    label()
+                    noop
+                end
+                """);
+        assertTrue(text.contains("""
+                    i2d
+                    invokestatic Program/r_number(D)D
+                    pop2
+                    invokestatic Program/r_label()Ljava/lang/String;
+                    pop
+                    invokestatic Program/r_noop()V
+                    return
+                """));
+    }
+
+    @Test
     void convertsCallArgumentsInEvaluationOrder() {
         String text = program("""
                 routine f(a: real, b: integer, c: real, d: integer, e: boolean): real is
