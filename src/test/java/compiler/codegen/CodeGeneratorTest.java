@@ -10,6 +10,8 @@ import compiler.semantic.SemanticTestSupport;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class CodeGeneratorTest {
 
@@ -150,6 +152,206 @@ class CodeGeneratorTest {
     void forwardDeclarationIsEmittedOnce() {
         String text = program("routine g(n: integer)\nroutine g(n: integer) is\nend\n");
         assertEquals(1, count(text, ".method public static r_g(I)V"));
+    }
+
+    @Test
+    void convertsCallArgumentsInEvaluationOrder() {
+        String text = program("""
+                routine f(a: real, b: integer, c: real, d: integer, e: boolean): real is
+                    return a
+                end
+                var result is f(3, 2.5, true, false, 1)
+                """);
+        assertTrue(text.contains("""
+                    ldc 3
+                    i2d
+                    ldc2_w 2.5
+                    invokestatic java/lang/Math/rint(D)D
+                    d2i
+                    iconst_1
+                    i2d
+                    iconst_0
+                    ldc 1
+                    invokestatic Program/r_f(DIDII)D
+                    putstatic Program/g_result D
+                """));
+    }
+
+    @Test
+    void nestedCallsConvertResultsBeforeEvaluatingNextArgument() {
+        String text = program("""
+                routine first(): integer is
+                    return 3
+                end
+                routine second(): real is
+                    return 2.5
+                end
+                routine combine(a: real, b: integer): integer is
+                    return b
+                end
+                var result: real is combine(first(), second())
+                """);
+        assertTrue(text.contains("""
+                    invokestatic Program/r_first()I
+                    i2d
+                    invokestatic Program/r_second()D
+                    invokestatic java/lang/Math/rint(D)D
+                    d2i
+                    invokestatic Program/r_combine(DI)I
+                    i2d
+                    putstatic Program/g_result D
+                """));
+    }
+
+    @Test
+    void passesReferenceArgumentsWithoutConversion() {
+        String text = program("""
+                type P is record
+                    var x: integer
+                end
+                var p: P
+                var values: array[2] integer
+                routine label(p: P, values: array[2] integer, s: string): string is
+                    return s
+                end
+                var result is label(p, values, "hello")
+                """);
+        assertTrue(text.contains("""
+                    getstatic Program/g_p LRec1;
+                    getstatic Program/g_values [I
+                    ldc "hello"
+                    invokestatic Program/r_label(LRec1;[ILjava/lang/String;)Ljava/lang/String;
+                    putstatic Program/g_result Ljava/lang/String;
+                """));
+    }
+
+    @Test
+    void callUsesForwardDeclaredSignature() {
+        String text = program("""
+                routine f(n: real): real
+                var result is f(7)
+                routine f(n: real): real is
+                    return n
+                end
+                """);
+        assertTrue(text.contains("""
+                    ldc 7
+                    i2d
+                    invokestatic Program/r_f(D)D
+                    putstatic Program/g_result D
+                """));
+        assertEquals(1, count(text, ".method public static r_f(D)D"));
+    }
+
+    @Test
+    void readsStringFromRecordArrayUsingOneBasedIndex() {
+        String text = program("""
+                type P is record
+                    var label: string
+                end
+                var items: array[2] P
+                var i is 2
+                var length is items[i].label.size
+                """);
+        assertTrue(text.contains("""
+                    getstatic Program/g_items [LRec1;
+                    getstatic Program/g_i I
+                    iconst_1
+                    isub
+                    aaload
+                    getfield Rec1/f_label Ljava/lang/String;
+                    invokevirtual java/lang/String/length()I
+                    putstatic Program/g_length I
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "+7, ldc 7", "-7, ineg", "-2.5, dneg", "not 0, ixor",
+        "7 + 2, iadd", "7 - 2, isub", "7 * 2, imul", "7 / 2, idiv", "7 % 2, irem",
+        "7.0 + 2, dadd", "7 - 2.0, dsub", "7.0 * 2.0, dmul", "7.0 / 2, ddiv",
+        "true and false, iand", "true or false, ior", "true xor false, ixor",
+        "1 and 0, iand"
+    })
+    void emitsUnaryArithmeticAndLogicalOperations(String expression, String instruction) {
+        assertHasLines(program("var result is " + expression), "    " + instruction);
+    }
+
+    @Test
+    void widensOperandsInEvaluationOrder() {
+        String text = program("var a is 3\nvar b is 2.5\nvar result is (a + b) / (b - a)");
+        assertTrue(text.contains("""
+                    getstatic Program/g_a I
+                    i2d
+                    getstatic Program/g_b D
+                    dadd
+                    getstatic Program/g_b D
+                    getstatic Program/g_a I
+                    i2d
+                    dsub
+                    ddiv
+                    putstatic Program/g_result D
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "integer, real, 3, D, i2d",
+        "boolean, real, true, D, i2d",
+        "real, integer, 2.5, I, round",
+        "boolean, integer, true, I, none",
+        "integer, integer, 3, I, none",
+        "real, real, 2.5, D, none"
+    })
+    void convertsGlobalInitializers(String sourceType, String targetType, String value,
+            String descriptor, String conversion) {
+        String text = program("var source: " + sourceType + " is " + value
+                + "\nvar result: " + targetType + " is source");
+        String instructions = switch (conversion) {
+            case "i2d" -> "    i2d\n";
+            case "round" -> "    invokestatic java/lang/Math/rint(D)D\n    d2i\n";
+            default -> "";
+        };
+        String sourceDescriptor = sourceType.equals("real") ? "D" : "I";
+        assertTrue(text.contains("    getstatic Program/g_source " + sourceDescriptor + "\n"
+                + instructions + "    putstatic Program/g_result " + descriptor + "\n"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0", "1"})
+    void booleanConstantsNeedNoConversion(int value) {
+        assertTrue(program("var result: boolean is " + value).contains(
+                "    ldc " + value + "\n    putstatic Program/g_result I\n"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"=, eq, dcmpl", "/=, ne, dcmpl", "<, lt, dcmpg",
+            "<=, le, dcmpg", ">, gt, dcmpl", ">=, ge, dcmpl"})
+    void comparisonsProduceBooleanValues(String operator, String condition, String compare) {
+        String integers = program("var result is 1 " + operator + " 2");
+        assertTrue(integers.contains("    if_icmp" + condition + " L1\n"
+                + "    iconst_0\n    goto L2\nL1:\n    iconst_1\nL2:\n"
+                + "    putstatic Program/g_result I\n"));
+        String reals = program("var result is 1 " + operator + " 2.0");
+        assertHasLines(reals, "    i2d", "    " + compare, "    if" + condition + " L1");
+    }
+
+    @Test
+    void comparesCharactersAndBooleansAsIntegers() {
+        assertHasLines(program("var result is 'a' < 'b'"), "    if_icmplt L1");
+        assertHasLines(program("var result is true /= false"), "    if_icmpne L1");
+    }
+
+    @Test
+    void comparesStringsByContentsAndInvertsInequality() {
+        String text = program("var a is \"a\"\nvar b is \"b\"\nvar eq is a = b\nvar ne is a /= b");
+        assertEquals(2, count(text, "invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z"));
+        assertTrue(text.contains("""
+                    invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z
+                    iconst_1
+                    ixor
+                    putstatic Program/g_ne I
+                """));
     }
 
     private static int count(String text, String part) {
