@@ -1,5 +1,7 @@
 package compiler.codegen;
 
+import compiler.ast.BlockNode;
+import compiler.ast.Node;
 import compiler.ast.Program;
 import compiler.ast.declaration.Declaration;
 import compiler.ast.declaration.Parameter;
@@ -18,6 +20,15 @@ import compiler.ast.expression.literal.CharLiteral;
 import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.ast.expression.literal.RealLiteral;
 import compiler.ast.expression.literal.StringLiteral;
+import compiler.ast.statement.AssignmentStatement;
+import compiler.ast.statement.IfStatement;
+import compiler.ast.statement.PrintStatement;
+import compiler.ast.statement.loop.BreakStatement;
+import compiler.ast.statement.loop.ContinueStatement;
+import compiler.ast.statement.loop.ForStatement;
+import compiler.ast.statement.loop.WhileStatement;
+import compiler.ast.statement.routine.ReturnStatement;
+import compiler.ast.statement.routine.RoutineCallStatement;
 import compiler.lexer.TokenType;
 import compiler.semantic.symbol.VariableSymbol;
 import compiler.semantic.SemanticModel;
@@ -81,12 +92,7 @@ public final class CodeGenerator {
         for (Declaration declaration : program.declarations) {
             if (declaration instanceof VariableDeclaration variable) {
                 SemanticType type = globalType(variable);
-                if (variable.initializer == null) {
-                    emitDefault(code, type);
-                } else {
-                    emitExpression(code, variable.initializer);
-                    emitConversion(model.typeOf(variable.initializer), type, code);
-                }
+                emitInitialValue(code, variable, type);
                 // store the initializer or default value in the global field
                 code.emit("putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(variable.name)
                         + " " + jvm.descriptor(type));
@@ -108,13 +114,11 @@ public final class CodeGenerator {
         return method(header, code);
     }
 
-    /** Fills the method body: for now only the default return value. */
     private void emitBody(RoutineDeclaration routine, SemanticType returnType, Code code) {
-        if (returnType != VoidType.INSTANCE) {
-            emitDefault(code, returnType);
+        if (!emitBlock(code, routine.body, returnType, null)) {
+            // Semantic analysis requires every path in a value-returning routine to return.
+            code.emit("return");
         }
-        // return the default value: return for void, ireturn, dreturn or areturn otherwise
-        code.emit(returnType == VoidType.INSTANCE ? "return" : jvm.prefix(returnType) + "return");
     }
 
     private String recordClass(RecordType record) {
@@ -212,19 +216,19 @@ public final class CodeGenerator {
             // push the string literal
             code.emit("ldc " + jvm.quote(s.value));
         } else if (expression instanceof ModifiablePrimaryNode variable) {
-            emitRead(code, variable);
+            emitRead(code, variable, variable.accessors.size());
         } else if (expression instanceof UnaryExpression unary) {
             emitUnary(code, unary);
         } else if (expression instanceof BinaryExpression binary) {
             emitBinary(code, binary);
         } else if (expression instanceof RoutineCallExpression call) {
-            emitCall(code, call);
+            emitCall(code, model.routineOf(call), call.args);
         } else {
             throw new UnsupportedOperationException("Unsupported expression: " + expression.getClass().getSimpleName());
         }
     }
 
-    private void emitRead(Code code, ModifiablePrimaryNode variable) {
+    private SemanticType emitRead(Code code, ModifiablePrimaryNode variable, int accessorCount) {
         VariableSymbol symbol = model.variableOf(variable);
         SemanticType type = symbol.type();
         if (symbol.kind() == VariableSymbol.Kind.GLOBAL) {
@@ -235,13 +239,10 @@ public final class CodeGenerator {
             // load the local variable or parameter from its slot
             code.emit(jvm.prefix(type) + "load " + code.slotOf(symbol));
         }
-        for (Accessor accessor : variable.accessors) {
+        for (int i = 0; i < accessorCount; i++) {
+            Accessor accessor = variable.accessors.get(i);
             if (accessor instanceof IndexAccess index) {
-                emitExpression(code, index.index);
-                // push the offset between source and JVM indices
-                code.emit("iconst_1");
-                // subtract one to obtain the zero-based JVM index
-                code.emit("isub");
+                emitIndex(code, index);
                 if (type instanceof ArrayType array) {
                     type = array.elementType();
                     // load the array element using the opcode for its type
@@ -264,6 +265,43 @@ public final class CodeGenerator {
                 }
             }
         }
+        return type;
+    }
+
+    private void emitIndex(Code code, IndexAccess index) {
+        emitExpression(code, index.index);
+        code.emit("iconst_1");
+        code.emit("isub");
+    }
+
+    private void emitAssignment(Code code, AssignmentStatement assignment) {
+        ModifiablePrimaryNode target = assignment.target;
+        SemanticType type = model.typeOf(target);
+        String store;
+        if (target.accessors.isEmpty()) {
+            VariableSymbol symbol = model.variableOf(target);
+            if (symbol.kind() == VariableSymbol.Kind.GLOBAL) {
+                store = "putstatic " + Jvm.PROGRAM_CLASS + "/" + jvm.globalName(symbol.name())
+                        + " " + jvm.descriptor(type);
+            } else {
+                store = jvm.prefix(type) + "store " + code.slotOf(symbol);
+            }
+        } else {
+            int last = target.accessors.size() - 1;
+            SemanticType owner = emitRead(code, target, last);
+            Accessor accessor = target.accessors.get(last);
+            if (accessor instanceof FieldAccess field && owner instanceof RecordType record) {
+                store = "putfield " + jvm.recordClass(record) + "/" + jvm.fieldName(field.name)
+                        + " " + jvm.descriptor(type);
+            } else if (accessor instanceof IndexAccess index && owner instanceof ArrayType) {
+                emitIndex(code, index);
+                store = jvm.prefix(type) + "astore";
+            } else {
+                throw new IllegalArgumentException("invalid assignment target");
+            }
+        }
+        emitConvertedExpression(code, assignment.value, type);
+        code.emit(store);
     }
 
     private void emitUnary(Code code, UnaryExpression unary) {
@@ -420,18 +458,208 @@ public final class CodeGenerator {
         }
     }
 
-    private void emitCall(Code code, RoutineCallExpression call) {
-        RoutineSymbol routine = model.routineOf(call);
-        for (int i = 0; i < call.args.size(); i++) {
-            Expression argument = call.args.get(i);
-            emitExpression(code, argument);
-            // Convert while this argument is on top, before evaluating the next one.
-            emitConversion(model.typeOf(argument), routine.parameterTypes().get(i), code);
+    private void emitCall(Code code, RoutineSymbol routine, List<Expression> arguments) {
+        for (int i = 0; i < arguments.size(); i++) {
+            Expression argument = arguments.get(i);
+            emitConvertedExpression(code, argument, routine.parameterTypes().get(i));
         }
         code.emit("invokestatic " + Jvm.PROGRAM_CLASS + "/" + jvm.methodName(routine.name())
                 + jvm.methodDescriptor(routine.parameterTypes(), routine.returnType()));
     }
 
+    private record LoopLabels(String continueTarget, String exit) {}
+
+    /** Returns true when no path falls through to the next statement. */
+    private boolean emitBlock(Code code, BlockNode block, SemanticType returnType, LoopLabels loop) {
+        for (Node item : block.items) {
+            if (item instanceof VariableDeclaration variable) {
+                VariableSymbol symbol = model.variableOf(variable);
+                int slot = code.declare(symbol);
+                emitInitialValue(code, variable, symbol.type());
+                code.emit(jvm.prefix(symbol.type()) + "store " + slot);
+            } else if (item instanceof AssignmentStatement assignment) {
+                emitAssignment(code, assignment);
+            } else if (item instanceof PrintStatement statement) {
+                emitPrint(code, statement);
+            } else if (item instanceof RoutineCallStatement call) {
+                RoutineSymbol routine = model.routineOf(call);
+                emitCall(code, routine, call.args);
+                if (routine.returnType() != VoidType.INSTANCE) {
+                    code.emit(routine.returnType() == PrimitiveType.REAL ? "pop2" : "pop");
+                }
+            } else if (item instanceof IfStatement statement) {
+                if (emitIf(code, statement, returnType, loop)) {
+                    return true;
+                }
+            } else if (item instanceof WhileStatement statement) {
+                emitWhile(code, statement, returnType);
+            } else if (item instanceof ForStatement statement) {
+                if (statement.rangeEnd == null) {
+                    emitArrayFor(code, statement, returnType);
+                } else {
+                    emitRangeFor(code, statement, returnType);
+                }
+            } else if (item instanceof BreakStatement) {
+                code.emit("goto " + loop.exit());
+                return true;
+            } else if (item instanceof ContinueStatement) {
+                code.emit("goto " + loop.continueTarget());
+                return true;
+            } else if (item instanceof ReturnStatement statement) {
+                if (statement.value != null) {
+                    emitConvertedExpression(code, statement.value, returnType);
+                }
+                emitReturnInstruction(code, returnType);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean emitIf(Code code, IfStatement statement, SemanticType returnType, LoopLabels loop) {
+        String onFalse = code.newLabel();
+        emitExpression(code, statement.condition);
+        code.emit("ifeq " + onFalse);
+        boolean thenStops = emitBlock(code, statement.thenBody, returnType, loop);
+        if (statement.elseBody == null) {
+            code.place(onFalse);
+            return false;
+        }
+        if (thenStops) {
+            code.place(onFalse);
+            return emitBlock(code, statement.elseBody, returnType, loop);
+        }
+
+        String end = code.newLabel();
+        code.emit("goto " + end);
+        code.place(onFalse);
+        emitBlock(code, statement.elseBody, returnType, loop);
+        code.place(end);
+        return false;
+    }
+
+    private void emitWhile(Code code, WhileStatement statement, SemanticType returnType) {
+        LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
+        code.place(loop.continueTarget());
+        emitExpression(code, statement.condition);
+        code.emit("ifeq " + loop.exit());
+        if (!emitBlock(code, statement.body, returnType, loop)) {
+            code.emit("goto " + loop.continueTarget());
+        }
+        code.place(loop.exit());
+    }
+
+    private void emitRangeFor(Code code, ForStatement statement, SemanticType returnType) {
+        int current = code.declare(model.variableOf(statement));
+        int last = code.newLocal(1);
+        int lower = statement.reverse ? last : current;
+        int upper = statement.reverse ? current : last;
+        emitExpression(code, statement.rangeStart);
+        code.emit("istore " + lower);
+        emitExpression(code, statement.rangeEnd);
+        code.emit("istore " + upper);
+
+        String body = code.newLabel();
+        LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
+        code.emit("iload " + lower);
+        code.emit("iload " + upper);
+        code.emit("if_icmpgt " + loop.exit());
+        code.place(body);
+        emitBlock(code, statement.body, returnType, loop);
+        code.place(loop.continueTarget());
+        // The inclusive endpoint must exit before iinc can wrap around.
+        code.emit("iload " + current);
+        code.emit("iload " + last);
+        code.emit("if_icmpeq " + loop.exit());
+        code.emit("iinc " + current + (statement.reverse ? " -1" : " 1"));
+        code.emit("goto " + body);
+        code.place(loop.exit());
+    }
+
+    private void emitArrayFor(Code code, ForStatement statement, SemanticType returnType) {
+        int array = code.newLocal(1);
+        int index = code.newLocal(1);
+        VariableSymbol element = model.variableOf(statement);
+        int value = code.declare(element);
+        emitExpression(code, statement.rangeStart);
+        code.emit("astore " + array);
+        if (statement.reverse) {
+            // (Length - 1) for reverse
+            code.emit("aload " + array);
+            code.emit("arraylength");
+            code.emit("iconst_1");
+            code.emit("isub");
+        } else {
+            // 0 is starting point for array traversing
+            code.emit("iconst_0");
+        }
+        code.emit("istore " + index);
+
+        String check = code.newLabel();
+        LoopLabels loop = new LoopLabels(code.newLabel(), code.newLabel());
+        code.place(check);
+        code.emit("iload " + index);
+        if (statement.reverse) {
+            code.emit("iflt " + loop.exit());
+        } else {
+            code.emit("aload " + array);
+            code.emit("arraylength");
+            code.emit("if_icmpge " + loop.exit());
+        }
+        code.emit("aload " + array);
+        code.emit("iload " + index);
+        String prefix = jvm.prefix(element.type());
+        code.emit(prefix + "aload");
+        code.emit(prefix + "store " + value);
+        emitBlock(code, statement.body, returnType, loop);
+        code.place(loop.continueTarget());
+        code.emit("iinc " + index + (statement.reverse ? " -1" : " 1"));
+        code.emit("goto " + check);
+        code.place(loop.exit());
+    }
+
+    private void emitReturnInstruction(Code code, SemanticType type) {
+        code.emit(type == VoidType.INSTANCE ? "return" : jvm.prefix(type) + "return");
+    }
+
+    private void emitConvertedExpression(Code code, Expression value, SemanticType type) {
+        emitExpression(code, value);
+        emitConversion(model.typeOf(value), type, code);
+    }
+
+    private void emitInitialValue(Code code, VariableDeclaration variable, SemanticType type) {
+        if (variable.initializer == null) {
+            emitDefault(code, type);
+        } else {
+            emitConvertedExpression(code, variable.initializer, type);
+        }
+    }
+
+    private void emitPrint(Code code, PrintStatement statement) {
+        String output = "getstatic java/lang/System/out Ljava/io/PrintStream;";
+        String print = "invokevirtual java/io/PrintStream/print";
+        for (int i = 0; i < statement.args.size(); i++) {
+            if (i > 0) {
+                code.emit(output);
+                code.emit("ldc 32");
+                code.emit(print + "(C)V");
+            }
+            Expression argument = statement.args.get(i);
+            SemanticType type = model.typeOf(argument);
+            code.emit(output);
+            String descriptor;
+            if (type == PrimitiveType.CHAR) {
+                emitStringOperand(code, argument);
+                descriptor = jvm.descriptor(StringType.INSTANCE);
+            } else {
+                emitExpression(code, argument);
+                descriptor = type == PrimitiveType.BOOLEAN ? "Z" : jvm.descriptor(type);
+            }
+            code.emit(print + "(" + descriptor + ")V");
+        }
+        code.emit(output);
+        code.emit("invokevirtual java/io/PrintStream/println()V");
+    }
 
     private SemanticType globalType(VariableDeclaration variable) {
         return model.variableOf(variable).type();

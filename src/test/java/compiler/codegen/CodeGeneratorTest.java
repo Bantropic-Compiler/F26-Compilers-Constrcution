@@ -149,9 +149,326 @@ class CodeGeneratorTest {
     }
 
     @Test
+    void localDeclarationsInitializeSlotsInSourceOrder() {
+        String text = program("""
+                routine f(seed: integer) is
+                    var count is seed
+                    type Measure is real
+                    var value: Measure is count
+                    var label: string
+                end
+                """);
+        assertTrue(text.contains("""
+                .limit locals 5
+                    iload 0
+                    istore 1
+                    iload 1
+                    i2d
+                    dstore 2
+                    ldc ""
+                    astore 4
+                    return
+                """));
+    }
+
+    @Test
+    void ifWithoutElseFallsThroughOnFalse() {
+        String text = program("""
+                routine f(flag: boolean): integer is
+                    if flag then return 1 end
+                    return 2
+                end
+                """);
+        assertTrue(text.contains("""
+                    iload 0
+                    ifeq L1
+                    ldc 1
+                    ireturn
+                L1:
+                    ldc 2
+                    ireturn
+                .end method
+                """));
+    }
+
+    @Test
+    void returningBranchesEndRoutine() {
+        String text = program("""
+                routine f(flag: boolean): integer is
+                    if flag then return 1 else return 2 end
+                    return 3
+                end
+                """);
+        assertTrue(text.contains("""
+                    iload 0
+                    ifeq L1
+                    ldc 1
+                    ireturn
+                L1:
+                    ldc 2
+                    ireturn
+                .end method
+                """));
+    }
+
+    @Test
+    void whileChecksConditionBeforeEachIterationAndThenBranchSkipsElse() {
+        String text = program("""
+                var n: integer
+                routine f(flag: boolean) is
+                    while n > 0 loop
+                        if flag then n := n - 1 else n := 0 end
+                    end
+                end
+                """);
+        assertTrue(text.contains("""
+                L1:
+                    getstatic Program/g_n I
+                    ldc 0
+                """));
+        assertTrue(text.contains("""
+                    ifeq L2
+                    iload 0
+                    ifeq L5
+                    getstatic Program/g_n I
+                    ldc 1
+                    isub
+                    putstatic Program/g_n I
+                    goto L6
+                L5:
+                    ldc 0
+                    putstatic Program/g_n I
+                L6:
+                    goto L1
+                L2:
+                    return
+                .end method
+                """));
+    }
+
+    @Test
+    void breakAndContinueTargetTheNearestWhile() {
+        String text = program("""
+                routine f(outer: boolean, inner: boolean, stop: boolean) is
+                    while outer loop
+                        while inner loop
+                            if stop then break else continue end
+                        end
+                        if stop then continue else break end
+                    end
+                end
+                """);
+        assertTrue(text.contains("""
+                L1:
+                    iload 0
+                    ifeq L2
+                L3:
+                    iload 1
+                    ifeq L4
+                    iload 2
+                    ifeq L5
+                    goto L4
+                L5:
+                    goto L3
+                L4:
+                    iload 2
+                    ifeq L6
+                    goto L1
+                L6:
+                    goto L2
+                L2:
+                    return
+                .end method
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, 0, 1, 1", "true, 1, 0, -1"})
+    void rangeForEvaluatesBoundsOnceAndChecksEndpointBeforeStepping(
+            boolean reverse, int lower, int upper, int step) {
+        String text = program("""
+                routine lo(): integer => 1
+                routine hi(): integer => 3
+                routine f() is
+                    for i in lo()..hi() %s loop
+                        var seen is i
+                        continue
+                    end
+                end
+                """.formatted(reverse ? "reverse" : ""));
+        assertEquals(1, count(text, "invokestatic Program/r_lo()I"));
+        assertEquals(1, count(text, "invokestatic Program/r_hi()I"));
+        assertTrue(text.contains("""
+                    invokestatic Program/r_lo()I
+                    istore %d
+                    invokestatic Program/r_hi()I
+                    istore %d
+                    iload %d
+                    iload %d
+                    if_icmpgt L3
+                L1:
+                    iload 0
+                    istore 2
+                    goto L2
+                L2:
+                    iload 0
+                    iload 1
+                    if_icmpeq L3
+                    iinc 0 %d
+                    goto L1
+                L3:
+                    return
+                """.formatted(lower, upper, lower, upper, step)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, integer, i", "true, real, d", "false, string, a"})
+    void arrayForCapturesSourceAndLoadsElementsAtEachIndex(
+            boolean reverse, String type, String prefix) {
+        String text = program("""
+                var values: array[3] %1$s
+                routine source(): array[3] %1$s => values
+                routine f() is
+                    for item in source() %2$s loop
+                        var seen is item
+                        continue
+                    end
+                end
+                """.formatted(type, reverse ? "reverse" : ""));
+        assertEquals(1, count(text, "invokestatic Program/r_source()"));
+        String initialIndex = reverse
+                ? "    aload 0\n    arraylength\n    iconst_1\n    isub\n"
+                : "    iconst_0\n";
+        String check = reverse ? "    iflt L3\n" : "    aload 0\n    arraylength\n    if_icmpge L3\n";
+        assertTrue(text.contains("    astore 0\n" + initialIndex + "    istore 1\nL1:\n    iload 1\n" + check
+                + "    aload 0\n    iload 1\n    " + prefix + "aload\n    " + prefix + "store 2\n"
+                + "    " + prefix + "load 2\n"));
+        assertTrue(text.contains("    goto L2\nL2:\n    iinc 1 " + (reverse ? -1 : 1)
+                + "\n    goto L1\nL3:\n    return\n"));
+    }
+
+    @Test
+    void evaluatesNestedAssignmentTargetOnceBeforeValue() {
+        String text = program("""
+                type Row is record
+                    var values: array[2] real
+                end
+                var rows: array[2] Row
+                routine index(): integer => 1
+                routine value(): integer => 7
+                routine update() is
+                    rows[index()].values[index()] := value()
+                    return
+                end
+                """);
+        assertTrue(text.contains("""
+                    getstatic Program/g_rows [LRec1;
+                    invokestatic Program/r_index()I
+                    iconst_1
+                    isub
+                    aaload
+                    getfield Rec1/f_values [D
+                    invokestatic Program/r_index()I
+                    iconst_1
+                    isub
+                    invokestatic Program/r_value()I
+                    i2d
+                    dastore
+                    return
+                .end method
+                """));
+    }
+
+    @Test
+    void storesLocalsGlobalsAndFieldsWithConversions() {
+        String text = program("""
+                type Box is record
+                    var n: integer
+                end
+                var total: real
+                routine update(box: Box): Box is
+                    var n: integer
+                    n := 2.5
+                    total := n
+                    box.n := n
+                    return box
+                end
+                """);
+        assertTrue(text.contains("""
+                    ldc2_w 2.5
+                    invokestatic java/lang/Math/rint(D)D
+                    d2i
+                    istore 1
+                    iload 1
+                    i2d
+                    putstatic Program/g_total D
+                    aload 0
+                    iload 1
+                    putfield Rec1/f_n I
+                    aload 0
+                    areturn
+                """));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"integer, real, iload, i2d, dreturn",
+                "real, integer, dload, invokestatic java/lang/Math/rint(D)D, ireturn"})
+    void convertsReturnValueToDeclaredType(String source, String target, String load,
+                                           String conversion, String instruction) {
+        String text = program("routine f(x: " + source + "): " + target + " => x");
+        assertHasLines(text, "    " + load + " 0", "    " + conversion, "    " + instruction);
+    }
+
+    @Test
     void forwardDeclarationIsEmittedOnce() {
         String text = program("routine g(n: integer)\nroutine g(n: integer) is\nend\n");
         assertEquals(1, count(text, ".method public static r_g(I)V"));
+    }
+
+    @Test
+    void printsScalarArgumentsWithSpacesAndOneNewline() {
+        String text = program("""
+                routine show() is
+                    print 7, 2.5, true, '😀', "end"
+                end
+                """);
+        String print = "invokevirtual java/io/PrintStream/print";
+        assertHasLines(text, "    " + print + "(I)V", "    " + print + "(D)V",
+                "    " + print + "(Z)V", "    ldc 128512",
+                "    invokestatic java/lang/Character/toString(I)Ljava/lang/String;");
+        assertEquals(2, count(text, print + "(Ljava/lang/String;)V"));
+        assertEquals(4, count(text, "ldc 32\n    " + print + "(C)V"));
+        assertEquals(1, count(text, print + "ln()V"));
+        assertTrue(text.contains("ldc \"end\"\n    " + print + "(Ljava/lang/String;)V\n"
+                + "    getstatic java/lang/System/out Ljava/io/PrintStream;\n    " + print + "ln()V"));
+    }
+
+    @Test
+    void discardsOnlyResultsOfStatementCalls() {
+        String text = program("""
+                routine number(x: real): real is
+                    return x
+                end
+                routine label(): string is
+                    return "ok"
+                end
+                routine noop() is
+                end
+                routine run() is
+                    number(1)
+                    label()
+                    noop
+                end
+                """);
+        assertTrue(text.contains("""
+                    i2d
+                    invokestatic Program/r_number(D)D
+                    pop2
+                    invokestatic Program/r_label()Ljava/lang/String;
+                    pop
+                    invokestatic Program/r_noop()V
+                    return
+                """));
     }
 
     @Test
