@@ -23,7 +23,9 @@ class CodeGeneratorTest {
     }
 
     private static String program(String source) {
-        return generate(source).get("Program.j");
+        // These assertions inspect source routines independently of launcher dispatch.
+        String text = generate(source).get("Program.j");
+        return text.substring(0, text.indexOf("\n.method public static main("));
     }
 
     private static void assertHasLines(String text, String... lines) {
