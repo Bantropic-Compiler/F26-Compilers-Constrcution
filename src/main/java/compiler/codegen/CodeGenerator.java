@@ -84,7 +84,118 @@ public final class CodeGenerator {
                 text.append('\n').append(routineMethod(routine));
             }
         }
-        return text.toString();
+        return text.append('\n').append(launcher(program)).toString();
+    }
+
+    private String launcher(Program program) {
+        Code code = new Code();
+        code.newLocal(1); // String[] args
+        String unknown = code.newLabel();
+        String invalid = code.newLabel();
+        code.emit("aload 0");
+        code.emit("arraylength");
+        code.emit("ifeq " + unknown);
+        for (Declaration declaration : program.declarations) {
+            if (!(declaration instanceof RoutineDeclaration routine) || routine.body == null) continue;
+            RoutineSymbol symbol = model.routineOf(routine);
+            List<SemanticType> types = symbol.parameterTypes();
+            if (types.stream().anyMatch(t -> !(t instanceof PrimitiveType) && t != StringType.INSTANCE)) continue;
+            String next = code.newLabel();
+            loadArgument(code, 0);
+            code.emit("ldc " + jvm.quote(routine.name));
+            code.emit("invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z");
+            code.emit("ifeq " + next);
+            code.emit("aload 0");
+            code.emit("arraylength");
+            code.emit("ldc " + (1 + types.size()));
+            code.emit("if_icmpne " + invalid);
+
+            // Store converted parameters before the call so validation branches have an empty stack.
+            int slot = 1;
+            for (int i = 0; i < types.size(); i++) {
+                SemanticType type = types.get(i);
+                emitArgument(code, i + 1, type, invalid);
+                code.emit(jvm.prefix(type) + "store " + slot);
+                slot += type == PrimitiveType.REAL ? 2 : 1;
+            }
+            if (slot > code.maxLocals()) code.newLocal(slot - code.maxLocals());
+            slot = 1;
+            for (SemanticType type : types) {
+                code.emit(jvm.prefix(type) + "load " + slot);
+                slot += type == PrimitiveType.REAL ? 2 : 1;
+            }
+            code.emit("invokestatic Program/" + jvm.methodName(routine.name)
+                    + jvm.methodDescriptor(types, symbol.returnType()));
+            if (symbol.returnType() != VoidType.INSTANCE) {
+                code.emit(symbol.returnType() == PrimitiveType.REAL ? "pop2" : "pop");
+            }
+            code.emit("return");
+            code.place(next);
+        }
+        code.place(unknown);
+        launcherError(code, "Missing or unknown entry routine");
+        code.place(invalid);
+        launcherError(code, "Invalid routine arguments");
+        return method(".method public static main([Ljava/lang/String;)V", code, Math.max(4, code.maxLocals()));
+    }
+
+    private void loadArgument(Code code, int index) {
+        code.emit("aload 0");
+        code.emit("ldc " + index);
+        code.emit("aaload");
+    }
+
+    private void emitArgument(Code code, int index, SemanticType type, String invalid) {
+        loadArgument(code, index);
+        if (type == PrimitiveType.BOOLEAN) {
+            String yes = code.newLabel();
+            String end = code.newLabel();
+            code.emit("ldc \"true\"");
+            code.emit("invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z");
+            code.emit("ifne " + yes);
+            loadArgument(code, index);
+            code.emit("ldc \"false\"");
+            code.emit("invokevirtual java/lang/String/equals(Ljava/lang/Object;)Z");
+            code.emit("ifeq " + invalid);
+            code.emit("iconst_0");
+            code.emit("goto " + end);
+            code.place(yes);
+            code.emit("iconst_1");
+            code.place(end);
+        } else if (type == PrimitiveType.CHAR) {
+            code.emit("iconst_0");
+            loadArgument(code, index);
+            code.emit("invokevirtual java/lang/String/length()I");
+            code.emit("invokevirtual java/lang/String/codePointCount(II)I");
+            code.emit("iconst_1");
+            code.emit("if_icmpne " + invalid);
+            loadArgument(code, index);
+            code.emit("iconst_0");
+            code.emit("invokevirtual java/lang/String/codePointAt(I)I");
+        } else if (type == PrimitiveType.INTEGER || type == PrimitiveType.REAL) {
+            String start = code.newLabel();
+            String end = code.newLabel();
+            String handler = code.newLabel();
+            code.emit(".catch java/lang/NumberFormatException from " + start + " to " + end + " using " + handler);
+            code.place(start);
+            code.emit(type == PrimitiveType.INTEGER
+                    ? "invokestatic java/lang/Integer/parseInt(Ljava/lang/String;)I"
+                    : "invokestatic java/lang/Double/parseDouble(Ljava/lang/String;)D");
+            code.emit("goto " + end);
+            code.place(handler);
+            code.emit("pop");
+            code.emit("goto " + invalid);
+            code.place(end);
+        }
+    }
+
+    private void launcherError(Code code, String message) {
+        code.emit("getstatic java/lang/System/err Ljava/io/PrintStream;");
+        code.emit("ldc " + jvm.quote(message));
+        code.emit("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V");
+        code.emit("iconst_1");
+        code.emit("invokestatic java/lang/System/exit(I)V");
+        code.emit("return");
     }
 
     private String staticInitializer(Program program) {
@@ -666,8 +777,12 @@ public final class CodeGenerator {
     }
 
     private String method(String header, Code code) {
+        return method(header, code, MAX_STACK);
+    }
+
+    private String method(String header, Code code, int stackLimit) {
         return header + "\n"
-                + ".limit stack " + MAX_STACK + "\n" // stack limit of the method, a fixed value
+                + ".limit stack " + stackLimit + "\n"
                 + ".limit locals " + code.maxLocals() + "\n" // number of local variable slots: this or parameters plus temporaries
                 + code.text()
                 + ".end method\n"; // end of the method
