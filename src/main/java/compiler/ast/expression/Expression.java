@@ -68,7 +68,7 @@ public abstract class Expression extends Node {
         return left;
     }
 
-    private static Expression parsePrimary(Parser p) {
+    public static Expression parsePrimary(Parser p) {
         Token token = p.getCurrent();
         return switch (token.type()) {
             case INTEGER_LITERAL -> IntegerLiteral.parse(p);

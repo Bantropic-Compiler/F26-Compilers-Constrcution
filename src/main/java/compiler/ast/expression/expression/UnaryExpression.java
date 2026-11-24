@@ -1,8 +1,6 @@
 package compiler.ast.expression.expression;
 
 import compiler.ast.expression.Expression;
-import compiler.ast.expression.literal.IntegerLiteral;
-import compiler.ast.expression.literal.RealLiteral;
 import compiler.lexer.Token;
 import compiler.lexer.TokenType;
 import compiler.parser.Parser;
@@ -19,27 +17,14 @@ public class UnaryExpression extends Expression {
         this.operand = operand;
     }
 
-    /** Signs precede integer or real literals. */
+    /** A sign or not applies to the primary expression that follows it. */
     public static UnaryExpression parse(Parser p) {
         if (!p.check(TokenType.PLUS) && !p.check(TokenType.MINUS) && !p.check(TokenType.NOT)) {
-            throw new ParserException("expected +, - or not before a numeric literal",
+            throw new ParserException("expected +, - or not",
                     p.getCurrent().line(), p.getCurrent().column());
         }
         Token operator = p.advance();
-
-        if (operator.type() == TokenType.NOT) {
-            return new UnaryExpression(operator.line(), operator.column(), operator.type(),
-                    IntegerLiteral.parse(p));
-        }
-        
-        Expression operand = switch (p.getCurrent().type()) {
-            case INTEGER_LITERAL -> IntegerLiteral.parse(p);
-            case REAL_LITERAL -> RealLiteral.parse(p);
-            default -> throw new ParserException(
-                    "expected a numeric literal after " + operator.type(),
-                    p.getCurrent().line(), p.getCurrent().column());
-        };
-        return new UnaryExpression(operator.line(), operator.column(), operator.type(),
-                operand);
+        Expression operand = Expression.parsePrimary(p);
+        return new UnaryExpression(operator.line(), operator.column(), operator.type(), operand);
     }
 }

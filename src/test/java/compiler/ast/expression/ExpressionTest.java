@@ -73,7 +73,7 @@ class ExpressionTest {
     }
 
     @Test
-    void unaryOperatorsFollowTheLiteralOnlyGrammar() {
+    void unaryOperatorsApplyToAnyPrimary() {
         UnaryExpression minus = assertInstanceOf(UnaryExpression.class, parseWhole("-5"));
         assertEquals(TokenType.MINUS, minus.op);
         assertEquals(5, assertInstanceOf(IntegerLiteral.class, minus.operand).value);
@@ -83,9 +83,11 @@ class ExpressionTest {
         UnaryExpression not = assertInstanceOf(UnaryExpression.class, parseWhole("not 5"));
         assertEquals(TokenType.NOT, not.op);
         assertEquals(5, assertInstanceOf(IntegerLiteral.class, not.operand).value);
-        assertThrows(ParserException.class, () -> parseWhole("not true"));
-        assertThrows(ParserException.class, () -> parseWhole("not flag"));
-        assertThrows(ParserException.class, () -> parseWhole("-value"));
+        UnaryExpression notTrue = assertInstanceOf(UnaryExpression.class, parseWhole("not true"));
+        assertInstanceOf(BooleanLiteral.class, notTrue.operand);
+        UnaryExpression minusValue = assertInstanceOf(UnaryExpression.class, parseWhole("-value"));
+        assertInstanceOf(ModifiablePrimaryNode.class, minusValue.operand);
+        assertThrows(ParserException.class, () -> parseWhole("-"));
     }
 
     @Test

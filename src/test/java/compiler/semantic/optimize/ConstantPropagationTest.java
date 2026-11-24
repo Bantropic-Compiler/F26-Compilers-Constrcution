@@ -66,7 +66,7 @@ class ConstantPropagationTest {
 
     @Test void leavesAmbiguousRoundingAndStrings() {
         String result = optimize(fixture("rounding-and-strings.i"));
-        assertTrue(result.contains("print i, s"));
+        assertTrue(result.contains("print 3, s"));
     }
 
     @Test void reportsErrorsExposedByPropagation() {

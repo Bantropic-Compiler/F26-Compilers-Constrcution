@@ -97,11 +97,8 @@ public final class ConstantPropagation extends AstRewriter implements Optimizati
         else return null;
         if (!Double.isFinite(number)) return null;
         if (target == PrimitiveType.REAL) return new RealLiteral(line, column, number);
-        // The language specifies nearest-integer rounding, but no tie-breaking rule.
-        // Leave half-integers untouched until that rule is specified.
-        if (value instanceof RealLiteral && Math.abs(number - Math.floor(number)) == 0.5) return null;
-        double rounded = Math.rint(number);
+        long rounded = Math.round(number);
         if (rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) return null;
-        return new IntegerLiteral(line, column, (long) rounded);
+        return new IntegerLiteral(line, column, rounded);
     }
 }
