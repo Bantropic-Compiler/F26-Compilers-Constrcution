@@ -398,8 +398,8 @@ class CodeGeneratorTest {
                 """);
         assertTrue(text.contains("""
                     ldc2_w 2.5
-                    invokestatic java/lang/Math/rint(D)D
-                    d2i
+                    invokestatic java/lang/Math/round(D)J
+                    l2i
                     istore 1
                     iload 1
                     i2d
@@ -414,7 +414,7 @@ class CodeGeneratorTest {
 
     @ParameterizedTest
     @CsvSource({"integer, real, iload, i2d, dreturn",
-                "real, integer, dload, invokestatic java/lang/Math/rint(D)D, ireturn"})
+                "real, integer, dload, invokestatic java/lang/Math/round(D)J, ireturn"})
     void convertsReturnValueToDeclaredType(String source, String target, String load,
                                            String conversion, String instruction) {
         String text = program("routine f(x: " + source + "): " + target + " => x");
@@ -485,8 +485,8 @@ class CodeGeneratorTest {
                     ldc 3
                     i2d
                     ldc2_w 2.5
-                    invokestatic java/lang/Math/rint(D)D
-                    d2i
+                    invokestatic java/lang/Math/round(D)J
+                    l2i
                     iconst_1
                     i2d
                     iconst_0
@@ -514,8 +514,8 @@ class CodeGeneratorTest {
                     invokestatic Program/r_first()I
                     i2d
                     invokestatic Program/r_second()D
-                    invokestatic java/lang/Math/rint(D)D
-                    d2i
+                    invokestatic java/lang/Math/round(D)J
+                    l2i
                     invokestatic Program/r_combine(DI)I
                     i2d
                     putstatic Program/g_result D
@@ -628,7 +628,7 @@ class CodeGeneratorTest {
                 + "\nvar result: " + targetType + " is source");
         String instructions = switch (conversion) {
             case "i2d" -> "    i2d\n";
-            case "round" -> "    invokestatic java/lang/Math/rint(D)D\n    d2i\n";
+            case "round" -> "    invokestatic java/lang/Math/round(D)J\n    l2i\n";
             default -> "";
         };
         String sourceDescriptor = sourceType.equals("real") ? "D" : "I";

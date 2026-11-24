@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import compiler.ast.expression.expression.BinaryExpression;
 import compiler.ast.expression.expression.UnaryExpression;
+import compiler.ast.expression.literal.BooleanLiteral;
 import compiler.ast.expression.literal.IntegerLiteral;
 import compiler.lexer.Lexer;
 import compiler.lexer.TokenType;
@@ -39,8 +40,10 @@ class NotExpressionTest {
     }
 
     @Test
-    void notBeforeANonNumericOperandIsStillASyntaxError() {
-        assertThrows(ParserException.class, () -> parse("not true"));
-        assertThrows(ParserException.class, () -> parse("not flag"));
+    void notAppliesToAnyPrimary() {
+        assertInstanceOf(BooleanLiteral.class, assertInstanceOf(UnaryExpression.class, parse("not true")).operand);
+        assertInstanceOf(ModifiablePrimaryNode.class, assertInstanceOf(UnaryExpression.class, parse("not flag")).operand);
+        assertInstanceOf(BinaryExpression.class, assertInstanceOf(UnaryExpression.class, parse("not (1 = 2)")).operand);
+        assertThrows(ParserException.class, () -> parse("not"));
     }
 }

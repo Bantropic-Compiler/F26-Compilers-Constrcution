@@ -92,6 +92,9 @@ public final class CodeGenerator {
         code.newLocal(1); // String[] args
         String unknown = code.newLabel();
         String invalid = code.newLabel();
+        String divisionByZero = code.newLabel();
+        String badIndex = code.newLabel();
+        String overflow = code.newLabel();
         code.emit("aload 0");
         code.emit("arraylength");
         code.emit("ifeq " + unknown);
@@ -124,8 +127,16 @@ public final class CodeGenerator {
                 code.emit(jvm.prefix(type) + "load " + slot);
                 slot += type == PrimitiveType.REAL ? 2 : 1;
             }
+            String callStart = code.newLabel();
+            String callEnd = code.newLabel();
+            code.place(callStart);
             code.emit("invokestatic Program/" + jvm.methodName(routine.name)
                     + jvm.methodDescriptor(types, symbol.returnType()));
+            code.place(callEnd);
+            String range = " from " + callStart + " to " + callEnd + " using ";
+            code.emit(".catch java/lang/ArithmeticException" + range + divisionByZero);
+            code.emit(".catch java/lang/IndexOutOfBoundsException" + range + badIndex);
+            code.emit(".catch java/lang/StackOverflowError" + range + overflow);
             if (symbol.returnType() != VoidType.INSTANCE) {
                 code.emit(symbol.returnType() == PrimitiveType.REAL ? "pop2" : "pop");
             }
@@ -136,6 +147,15 @@ public final class CodeGenerator {
         launcherError(code, "Missing or unknown entry routine");
         code.place(invalid);
         launcherError(code, "Invalid routine arguments");
+        code.place(divisionByZero);
+        code.emit("pop");
+        launcherError(code, "Runtime error: division by zero");
+        code.place(badIndex);
+        code.emit("pop");
+        launcherError(code, "Runtime error: array index out of range");
+        code.place(overflow);
+        code.emit("pop");
+        launcherError(code, "Runtime error: stack overflow");
         return method(".method public static main([Ljava/lang/String;)V", code, Math.max(4, code.maxLocals()));
     }
 
@@ -501,9 +521,9 @@ public final class CodeGenerator {
                 && (sourceType == PrimitiveType.INTEGER || sourceType == PrimitiveType.BOOLEAN)) {
             code.emit("i2d");
         } else if (targetType == PrimitiveType.INTEGER && sourceType == PrimitiveType.REAL) {
-            // round to the nearest integer, choosing the even integer for ties
-            code.emit("invokestatic java/lang/Math/rint(D)D");
-            code.emit("d2i");
+            // round to the nearest integer, halves go up
+            code.emit("invokestatic java/lang/Math/round(D)J");
+            code.emit("l2i");
         }
     }
 
